@@ -1,66 +1,59 @@
-# Jeerah Business & Economy System
 
-Large multi-system feature. I'll scaffold DB + UI in coherent layers, reusing existing glassmorphism/dark style and spring animations.
+# NOWPayments (USDT TRC20) Migration Plan
 
-## 1. Database (Supabase migration)
+## ⚠️ Security notice — please act before we continue
 
-**Update `profiles`**
-- `subscription_type` text default `'none'` (none | normal | business)
-- `subscription_expires_at` timestamptz nullable
-- `wallet_balance` numeric default 0
-- `photo_slots` int default 2
-- (`points` already exists)
+You pasted your **NOWPayments API key and IPN secret in plain chat**. Treat both as compromised:
 
-**New tables**
-- `ads` — `user_id`, `title`, `content`, `image_url`, `location_lat/lng`, `radius_km` (1|2|3), `is_active`, `expires_at`, timestamps. RLS: public SELECT active ads; owner all.
-- `delivery_jobs` — `requester_id`, `worker_id` nullable, `pickup_lat/lng`, `dropoff_lat/lng`, `title`, `description`, `price` numeric, `commission_fee` numeric (computed 13%), `status` enum (open|accepted|completed|cancelled). RLS: public SELECT open; involved users update.
-- `wallet_transactions` — `user_id`, `amount` numeric (+/-), `type` (topup|commission|payout|boost|subscription|photo_slot), `reference_id`, `note`, created_at. RLS: user reads own.
-- `boosts` — `user_id`, `target_type` (profile|item|news), `target_id`, `points_spent`, `expires_at`. RLS: public SELECT active; owner insert.
+1. Log into NOWPayments → **rotate the API key** and **regenerate the IPN secret** before we wire them in.
+2. I'll request them through Lovable's secure secrets form (`NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`) so they live only as backend env vars — never in source, never in the repo.
+3. The payout wallet (`TAQza77…`) is configured **inside your NOWPayments dashboard**, not in the app. I won't hardcode it.
 
-**RPC functions** (security definer)
-- `complete_delivery_job(job_id)` — sets status completed, debits 13% commission from worker wallet, logs transaction.
-- `redeem_points_for_subscription()` — costs e.g. 1000 points → 30 days normal sub.
-- `boost_target(target_type, target_id, points)` — debits points, inserts boost (24h).
-- `purchase_photo_slots(slots)` — debits wallet, increments `photo_slots`.
-- `purchase_subscription(plan)` — debits wallet, sets sub + expiry.
+## What changes
 
-## 2. UI Pages & Components
+### 1. Database (migration)
+- New table `payment_invoices`:
+  - `id`, `user_id`, `purpose` (`topup` | `subscription` | `photo_slot`), `purpose_payload` (jsonb — e.g. `{plan:'normal'}` or `{slots:2}`), `amount_sar` numeric, `np_invoice_id` text, `np_payment_id` text, `pay_address` text, `pay_amount` numeric, `pay_currency` text default `'usdttrc20'`, `status` text (`pending`|`confirming`|`confirmed`|`failed`|`expired`), `raw_ipn` jsonb, timestamps.
+  - RLS: user reads own; only service role writes (edge functions use service key).
+- Drop `dev_topup_wallet` (dev-only mock).
+- New `credit_wallet_for_invoice(p_invoice_id uuid)` security-definer RPC: idempotent — if invoice `status='confirmed'` and not yet applied, credit wallet / apply subscription / add photo slots based on `purpose`, log to `wallet_transactions`, mark invoice as `applied_at`.
 
-**New pages**
-- `src/pages/SubscriptionPage.tsx` — three tier cards (None / Normal 19SAR / Business 49SAR), Ruul placeholder button, "Redeem with points" button, photo-slots upsell card.
-- `src/pages/BusinessHubPage.tsx` — tabs: "متجري" (business listings, gated), "التوصيل" (delivery jobs marketplace, free), "الإعلانات" (manage ads), "المحفظة" (wallet + transactions).
+### 2. Edge functions
+- `nowpayments-create-invoice` (JWT-protected):
+  - Input: `{ purpose, amount_sar, payload? }`. Validates with zod.
+  - Calls `POST https://api.nowpayments.io/v1/payment` with `price_amount`, `price_currency:'sar'`, `pay_currency:'usdttrc20'`, `order_id` = our invoice row id, `ipn_callback_url` pointing to the webhook.
+  - Stores invoice + returns `{ pay_address, pay_amount, pay_currency, np_payment_id, qr_data }`.
+- `nowpayments-ipn` (public, `verify_jwt=false`):
+  - Reads raw body, computes HMAC-SHA512 with `NOWPAYMENTS_IPN_SECRET` over **sorted JSON keys** (per NOWPayments spec), compares to `x-nowpayments-sig` header — reject 401 on mismatch.
+  - Maps `payment_status` → our status (`waiting`/`confirming` → `confirming`, `finished` → `confirmed`, `failed`/`expired`/`refunded` → `failed`).
+  - On `confirmed`, calls `credit_wallet_for_invoice` (idempotent).
+- `nowpayments-invoice-status` (JWT-protected): polls our row (and optionally NOWPayments) so the UI can show live state without waiting for IPN.
 
-**New components**
-- `src/components/WalletCard.tsx` — balance, top-up placeholder, commission summary.
-- `src/components/AdComposer.tsx` — title/content/image/radius selector → inserts into `ads` at user location.
-- `src/components/AdPopup.tsx` — glass modal shown once per session if user within ad radius.
-- `src/components/BoostButton.tsx` — small action to spend points to boost.
-- `src/components/MapAdsLayer.tsx` — renders ad pins on Leaflet (custom megaphone icon).
+### 3. Frontend
+- **Remove** `PaymentPlaceholderDialog.tsx` and the Ruul URL/button everywhere.
+- New `CryptoPaymentDialog.tsx`:
+  - Calls `nowpayments-create-invoice` on open.
+  - Shows: amount in SAR, equivalent USDT amount, TRC20 address (copy button), QR (generated client-side from `pay_address` via `qrcode` lib), countdown to expiry, network = "TRC20 (Tron) — USDT only" warning.
+  - Polls status every 8s; renders three states: **Pending** (waiting for transfer), **Confirmed** (success toast + close + invalidate wallet/profile queries), **Failed/Expired** (retry button).
+- `WalletCard.tsx`: replace mock "شحن 50 ر.س" with "شحن المحفظة" → opens `CryptoPaymentDialog` with amount input (10–1000 SAR).
+- `SubscriptionPage.tsx`: subscription tier + photo-slot buttons open `CryptoPaymentDialog` with the right `purpose`/amount instead of calling the wallet RPCs directly. Wallet RPCs (`purchase_subscription`, `purchase_photo_slots`) stay — they're now the post-payment fulfillment path (called via `credit_wallet_for_invoice`, not from the client).
 
-**Routing & nav**
-- Add routes `/subscription` and `/business` in `App.tsx`.
-- Add a "الأعمال" entry in `BottomNav` or a side entry in Profile menu (preserve 5-tab layout — put Business in Profile page side actions and Subscription as well).
-
-## 3. Map Ads + Popup
-- `MapPage` mounts `MapAdsLayer` and `AdPopup` checker (queries active ads, computes distance from user location, opens popup for nearest unseen ad — sessionStorage dedupe).
-
-## 4. Boosts in feeds
-- `useItems` and news feed query: order by `boosted desc, created_at desc` using a left join view, or simpler: client-side merge with active boosts list.
-
-## 5. Visual / Motion
-- Reuse `glass-strong`, `shadow-soft-lg`, `rounded-3xl`, `spring.tap`, `tapScale`, `EASE_PREMIUM`, `gpu` classes.
-- Subscription cards use gradient borders for Business tier.
-- Ad popup uses scale-in spring + backdrop blur.
+### 4. Config
+- Add to `supabase/config.toml`:
+  ```toml
+  [functions.nowpayments-ipn]
+  verify_jwt = false
+  ```
 
 ## Technical notes
-- Commission = round(price * 0.13, 2) computed in RPC, not trusted from client.
-- Ads expire 7 days from creation by default.
-- Boost duration: 24h.
-- Photo slots price: 9 SAR per extra slot, max 8.
-- All payment buttons currently open a placeholder dialog with "سيتم التوجيه إلى Ruul قريبًا" + a mock "محاكاة الدفع" button (dev only) that calls the RPC.
+- NOWPayments minimum invoice is ~$2 — I'll enforce a 10 SAR minimum client-side and show their min if their API rejects.
+- Signature verification: NOWPayments requires the JSON to be re-serialized with **sorted keys** before HMAC — I'll implement that exactly, otherwise valid IPNs get rejected.
+- All status transitions are server-side; the client never marks an invoice paid.
+- `order_id` = our invoice UUID lets us look up the row from the IPN even if NOWPayments retries.
 
-## Out of scope (placeholder only)
-- Real Ruul redirect URL — left as TODO env var `RUUL_CHECKOUT_URL`.
-- Real top-up flow — mock button credits wallet for now.
+## What I need from you to proceed
+1. **Confirm** you've rotated the API key + IPN secret in NOWPayments.
+2. After you approve this plan, I'll prompt for `NOWPAYMENTS_API_KEY` and `NOWPAYMENTS_IPN_SECRET` via the secure secrets form.
+3. Confirm the SAR top-up range (default I'll use: **10–1000 SAR**).
 
 Shall I proceed?
