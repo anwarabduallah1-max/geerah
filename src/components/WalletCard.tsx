@@ -64,7 +64,7 @@ export function WalletCard() {
         <div className="mt-4 flex items-center gap-2">
           <Input
             type="number"
-            min={10}
+            min={150}
             max={1000}
             value={amount}
             onChange={(e) => setAmount(Number(e.target.value))}
@@ -75,13 +75,13 @@ export function WalletCard() {
             whileTap={tapScale}
             transition={spring.tap}
             onClick={openTopup}
-            disabled={!amount || amount < 10 || amount > 1000}
+            disabled={!amount || amount < 150 || amount > 1000}
             className="inline-flex items-center gap-1 text-xs font-bold px-4 h-10 rounded-2xl bg-primary text-primary-foreground disabled:opacity-50 gpu tap-fast shrink-0"
           >
             <Plus size={14} /> شحن USDT
           </motion.button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1.5">الحد الأدنى 10 ر.س — يُدفع عبر USDT (TRC20)</p>
+        <p className="text-[10px] text-muted-foreground mt-1.5">الحد الأدنى 150 ر.س — يُدفع عبر USDT (TRC20)</p>
       </motion.div>
 
       <motion.div variants={staggerItem} transition={spring.staggerChild} className="space-y-2">
