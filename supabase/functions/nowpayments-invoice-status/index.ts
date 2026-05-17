@@ -15,8 +15,14 @@ Deno.serve(async (req) => {
   const { data: claims, error } = await userClient.auth.getClaims(authHeader.replace('Bearer ', ''))
   if (error || !claims?.claims) return json({ error: 'Unauthorized' }, 401)
 
-  const url = new URL(req.url)
-  const id = url.searchParams.get('id')
+  let id: string | null = null
+  try {
+    const body = await req.json()
+    id = body?.id ?? null
+  } catch {
+    const url = new URL(req.url)
+    id = url.searchParams.get('id')
+  }
   if (!id) return json({ error: 'Missing id' }, 400)
 
   const { data, error: qErr } = await userClient

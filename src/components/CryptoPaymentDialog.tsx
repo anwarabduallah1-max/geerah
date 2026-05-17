@@ -73,10 +73,9 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
   useEffect(() => {
     if (!invoice) return;
     const poll = async () => {
-      const { data, error } = await supabase.functions.invoke(
-        `nowpayments-invoice-status?id=${invoice.invoice_id}`,
-        { method: "GET" as any },
-      );
+      const { data, error } = await supabase.functions.invoke("nowpayments-invoice-status", {
+        body: { id: invoice.invoice_id },
+      });
       if (error || !data) return;
       const s = (data as any).status as Status;
       setStatus(s);
