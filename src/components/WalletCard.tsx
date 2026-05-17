@@ -1,15 +1,19 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Wallet, Plus, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { spring, tapScale, staggerContainer, staggerItem } from "@/lib/spring";
-import { toast } from "sonner";
+import { CryptoPaymentDialog } from "@/components/CryptoPaymentDialog";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export function WalletCard() {
   const { user } = useAuth();
-  const qc = useQueryClient();
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [amount, setAmount] = useState<number>(50);
+  const [confirmed, setConfirmed] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
@@ -34,21 +38,12 @@ export function WalletCard() {
     },
   });
 
-  const topup = useMutation({
-    mutationFn: async (amount: number) => {
-      const { data, error } = await supabase.rpc("dev_topup_wallet", { p_amount: amount });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      toast.success("تم شحن المحفظة (تجريبي)");
-      qc.invalidateQueries({ queryKey: ["my-profile"] });
-      qc.invalidateQueries({ queryKey: ["wallet-tx"] });
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
   const balance = Number(profile?.wallet_balance || 0);
+
+  const openTopup = () => {
+    setConfirmed(true);
+    setTopupOpen(true);
+  };
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3">
@@ -62,17 +57,31 @@ export function WalletCard() {
             <Wallet size={18} className="text-primary" />
             <span className="text-sm font-bold">محفظتي</span>
           </div>
-          <motion.button
-            whileTap={tapScale}
-            transition={spring.tap}
-            onClick={() => topup.mutate(50)}
-            className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-2xl bg-primary text-primary-foreground gpu tap-fast"
-          >
-            <Plus size={12} /> شحن 50 ر.س
-          </motion.button>
         </div>
         <p className="text-3xl font-bold">{balance.toFixed(2)} <span className="text-base text-muted-foreground">ر.س</span></p>
         <p className="text-[11px] text-muted-foreground mt-1">عمولة خدمة التوصيل: 13% تُخصم تلقائيًا عند إتمام الطلب</p>
+
+        <div className="mt-4 flex items-center gap-2">
+          <Input
+            type="number"
+            min={10}
+            max={1000}
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            className="rounded-2xl text-right"
+            placeholder="المبلغ بالريال"
+          />
+          <motion.button
+            whileTap={tapScale}
+            transition={spring.tap}
+            onClick={openTopup}
+            disabled={!amount || amount < 10 || amount > 1000}
+            className="inline-flex items-center gap-1 text-xs font-bold px-4 h-10 rounded-2xl bg-primary text-primary-foreground disabled:opacity-50 gpu tap-fast shrink-0"
+          >
+            <Plus size={14} /> شحن USDT
+          </motion.button>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1.5">الحد الأدنى 10 ر.س — يُدفع عبر USDT (TRC20)</p>
       </motion.div>
 
       <motion.div variants={staggerItem} transition={spring.staggerChild} className="space-y-2">
@@ -100,6 +109,16 @@ export function WalletCard() {
           );
         })}
       </motion.div>
+
+      {confirmed && (
+        <CryptoPaymentDialog
+          open={topupOpen}
+          onOpenChange={(o) => { setTopupOpen(o); if (!o) setConfirmed(false); }}
+          title="شحن المحفظة"
+          amountSar={amount}
+          purpose="topup"
+        />
+      )}
     </motion.div>
   );
 }
