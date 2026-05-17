@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,7 +7,6 @@ import { spring, tapScale, staggerContainer, staggerItem } from "@/lib/spring";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Image as ImageIcon, Coins, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
-import { CryptoPaymentDialog } from "@/components/CryptoPaymentDialog";
 
 type Plan = "normal" | "business";
 
@@ -134,7 +132,8 @@ export default function SubscriptionPage() {
               <motion.button
                 whileTap={tapScale}
                 transition={spring.tap}
-                onClick={() => setPayPlan(plan.id)}
+                onClick={() => buyPlan.mutate(plan.id)}
+                disabled={buyPlan.isPending}
                 className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm gpu tap-fast"
               >
                 {isCurrent ? "تجديد" : "اشترك الآن"}
@@ -151,8 +150,8 @@ export default function SubscriptionPage() {
               <p className="text-xs text-muted-foreground">{slots}/8 — أضف صوراً أكثر لملفك بدفعة واحدة (9 ر.س للخانة)</p>
             </div>
           </div>
-          <Button onClick={() => setSlotsPay(true)} disabled={slots >= 8} className="w-full rounded-2xl" variant="outline">
-            شراء خانة إضافية
+          <Button onClick={() => buySlot.mutate()} disabled={slots >= 8 || buySlot.isPending} className="w-full rounded-2xl" variant="outline">
+            شراء خانة إضافية (من المحفظة)
           </Button>
         </motion.div>
       </motion.div>
