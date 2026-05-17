@@ -35,8 +35,6 @@ export default function SubscriptionPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [payPlan, setPayPlan] = useState<Plan | null>(null);
-  const [slotsPay, setSlotsPay] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
@@ -55,6 +53,28 @@ export default function SubscriptionPage() {
       if (!r?.success) throw new Error(r?.error === "insufficient_points" ? `تحتاج ${r.needed} نقطة، لديك ${r.have}` : r?.error);
     },
     onSuccess: () => { toast.success("تم استبدال النقاط باشتراك عادي 🎉"); qc.invalidateQueries({ queryKey: ["my-profile"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const buyPlan = useMutation({
+    mutationFn: async (plan: Plan) => {
+      const { data, error } = await supabase.rpc("purchase_subscription", { p_plan: plan });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.success) throw new Error(r?.error === "insufficient_balance" ? `الرصيد غير كافٍ — تحتاج ${r.needed} ر.س. اشحن محفظتك أولاً.` : r?.error);
+    },
+    onSuccess: () => { toast.success("تم تفعيل الاشتراك 🎉"); qc.invalidateQueries({ queryKey: ["my-profile"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const buySlot = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("purchase_photo_slots", { p_slots: 1 });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.success) throw new Error(r?.error === "insufficient_balance" ? `الرصيد غير كافٍ — تحتاج ${r.needed} ر.س. اشحن محفظتك أولاً.` : r?.error);
+    },
+    onSuccess: () => { toast.success("تمت إضافة خانة صور 🎉"); qc.invalidateQueries({ queryKey: ["my-profile"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
