@@ -8,7 +8,7 @@ import { spring, tapScale, staggerContainer, staggerItem } from "@/lib/spring";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Image as ImageIcon, Coins, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
-import { PaymentPlaceholderDialog } from "@/components/PaymentPlaceholderDialog";
+import { CryptoPaymentDialog } from "@/components/CryptoPaymentDialog";
 
 type Plan = "normal" | "business";
 
@@ -35,7 +35,7 @@ export default function SubscriptionPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [payOpen, setPayOpen] = useState<Plan | null>(null);
+  const [payPlan, setPayPlan] = useState<Plan | null>(null);
   const [slotsPay, setSlotsPay] = useState(false);
 
   const { data: profile } = useQuery({
@@ -47,21 +47,6 @@ export default function SubscriptionPage() {
     },
   });
 
-  const buySub = useMutation({
-    mutationFn: async (plan: Plan) => {
-      const { data, error } = await supabase.rpc("purchase_subscription", { p_plan: plan });
-      if (error) throw error;
-      const r = data as any;
-      if (!r?.success) throw new Error(r?.error === "insufficient_balance" ? `رصيدك غير كافٍ — تحتاج ${r.needed} ر.س` : r?.error);
-    },
-    onSuccess: () => {
-      toast.success("تم تفعيل الاشتراك 🎉");
-      qc.invalidateQueries({ queryKey: ["my-profile"] });
-      setPayOpen(null);
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
   const redeemPoints = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("redeem_points_for_subscription");
@@ -70,17 +55,6 @@ export default function SubscriptionPage() {
       if (!r?.success) throw new Error(r?.error === "insufficient_points" ? `تحتاج ${r.needed} نقطة، لديك ${r.have}` : r?.error);
     },
     onSuccess: () => { toast.success("تم استبدال النقاط باشتراك عادي 🎉"); qc.invalidateQueries({ queryKey: ["my-profile"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const buySlots = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc("purchase_photo_slots", { p_slots: 1 });
-      if (error) throw error;
-      const r = data as any;
-      if (!r?.success) throw new Error(r?.error === "insufficient_balance" ? `رصيدك غير كافٍ — تحتاج ${r.needed} ر.س` : r?.error);
-    },
-    onSuccess: () => { toast.success("تمت إضافة خانة صورة جديدة"); qc.invalidateQueries({ queryKey: ["my-profile"] }); setSlotsPay(false); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -140,7 +114,7 @@ export default function SubscriptionPage() {
               <motion.button
                 whileTap={tapScale}
                 transition={spring.tap}
-                onClick={() => setPayOpen(plan.id)}
+                onClick={() => setPayPlan(plan.id)}
                 className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm gpu tap-fast"
               >
                 {isCurrent ? "تجديد" : "اشترك الآن"}
@@ -163,21 +137,21 @@ export default function SubscriptionPage() {
         </motion.div>
       </motion.div>
 
-      <PaymentPlaceholderDialog
-        open={!!payOpen}
-        onOpenChange={(o) => !o && setPayOpen(null)}
-        title={payOpen === "business" ? "اشتراك تجاري" : "اشتراك عادي"}
-        amount={payOpen === "business" ? 49 : 19}
-        onSimulatePay={() => payOpen && buySub.mutate(payOpen)}
-        isPending={buySub.isPending}
+      <CryptoPaymentDialog
+        open={!!payPlan}
+        onOpenChange={(o) => !o && setPayPlan(null)}
+        title={payPlan === "business" ? "اشتراك تجاري" : "اشتراك عادي"}
+        amountSar={payPlan === "business" ? 49 : 19}
+        purpose="subscription"
+        payload={{ plan: payPlan }}
       />
-      <PaymentPlaceholderDialog
+      <CryptoPaymentDialog
         open={slotsPay}
         onOpenChange={setSlotsPay}
         title="خانة صور إضافية"
-        amount={9}
-        onSimulatePay={() => buySlots.mutate()}
-        isPending={buySlots.isPending}
+        amountSar={9}
+        purpose="photo_slot"
+        payload={{ slots: 1 }}
       />
     </div>
   );
