@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,7 +7,6 @@ import { spring, tapScale, staggerContainer, staggerItem } from "@/lib/spring";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Image as ImageIcon, Coins, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
-import { CryptoPaymentDialog } from "@/components/CryptoPaymentDialog";
 
 type Plan = "normal" | "business";
 
@@ -35,8 +33,6 @@ export default function SubscriptionPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [payPlan, setPayPlan] = useState<Plan | null>(null);
-  const [slotsPay, setSlotsPay] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
@@ -55,6 +51,28 @@ export default function SubscriptionPage() {
       if (!r?.success) throw new Error(r?.error === "insufficient_points" ? `تحتاج ${r.needed} نقطة، لديك ${r.have}` : r?.error);
     },
     onSuccess: () => { toast.success("تم استبدال النقاط باشتراك عادي 🎉"); qc.invalidateQueries({ queryKey: ["my-profile"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const buyPlan = useMutation({
+    mutationFn: async (plan: Plan) => {
+      const { data, error } = await supabase.rpc("purchase_subscription", { p_plan: plan });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.success) throw new Error(r?.error === "insufficient_balance" ? `الرصيد غير كافٍ — تحتاج ${r.needed} ر.س. اشحن محفظتك أولاً.` : r?.error);
+    },
+    onSuccess: () => { toast.success("تم تفعيل الاشتراك 🎉"); qc.invalidateQueries({ queryKey: ["my-profile"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const buySlot = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("purchase_photo_slots", { p_slots: 1 });
+      if (error) throw error;
+      const r = data as any;
+      if (!r?.success) throw new Error(r?.error === "insufficient_balance" ? `الرصيد غير كافٍ — تحتاج ${r.needed} ر.س. اشحن محفظتك أولاً.` : r?.error);
+    },
+    onSuccess: () => { toast.success("تمت إضافة خانة صور 🎉"); qc.invalidateQueries({ queryKey: ["my-profile"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -114,7 +132,8 @@ export default function SubscriptionPage() {
               <motion.button
                 whileTap={tapScale}
                 transition={spring.tap}
-                onClick={() => setPayPlan(plan.id)}
+                onClick={() => buyPlan.mutate(plan.id)}
+                disabled={buyPlan.isPending}
                 className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm gpu tap-fast"
               >
                 {isCurrent ? "تجديد" : "اشترك الآن"}
@@ -131,28 +150,12 @@ export default function SubscriptionPage() {
               <p className="text-xs text-muted-foreground">{slots}/8 — أضف صوراً أكثر لملفك بدفعة واحدة (9 ر.س للخانة)</p>
             </div>
           </div>
-          <Button onClick={() => setSlotsPay(true)} disabled={slots >= 8} className="w-full rounded-2xl" variant="outline">
-            شراء خانة إضافية
+          <Button onClick={() => buySlot.mutate()} disabled={slots >= 8 || buySlot.isPending} className="w-full rounded-2xl" variant="outline">
+            شراء خانة إضافية (من المحفظة)
           </Button>
         </motion.div>
       </motion.div>
 
-      <CryptoPaymentDialog
-        open={!!payPlan}
-        onOpenChange={(o) => !o && setPayPlan(null)}
-        title={payPlan === "business" ? "اشتراك تجاري" : "اشتراك عادي"}
-        amountSar={payPlan === "business" ? 49 : 19}
-        purpose="subscription"
-        payload={{ plan: payPlan }}
-      />
-      <CryptoPaymentDialog
-        open={slotsPay}
-        onOpenChange={setSlotsPay}
-        title="خانة صور إضافية"
-        amountSar={9}
-        purpose="photo_slot"
-        payload={{ slots: 1 }}
-      />
     </div>
   );
 }
