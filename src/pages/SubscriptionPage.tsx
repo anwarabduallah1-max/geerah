@@ -156,22 +156,6 @@ export default function SubscriptionPage() {
         </motion.div>
       </motion.div>
 
-      <CryptoPaymentDialog
-        open={!!payPlan}
-        onOpenChange={(o) => !o && setPayPlan(null)}
-        title={payPlan === "business" ? "اشتراك تجاري" : "اشتراك عادي"}
-        amountSar={payPlan === "business" ? 49 : 19}
-        purpose="subscription"
-        payload={{ plan: payPlan }}
-      />
-      <CryptoPaymentDialog
-        open={slotsPay}
-        onOpenChange={setSlotsPay}
-        title="خانة صور إضافية"
-        amountSar={9}
-        purpose="photo_slot"
-        payload={{ slots: 1 }}
-      />
     </div>
   );
 }
