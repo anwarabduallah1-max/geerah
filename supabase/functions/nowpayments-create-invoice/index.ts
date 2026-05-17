@@ -57,8 +57,9 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'x-api-key': npApiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        price_amount: amount_sar,
-        price_currency: 'sar',
+        // NOWPayments doesn't support SAR as a fiat — convert to USD (1 SAR ≈ 0.2667 USD)
+        price_amount: Number((amount_sar * 0.2667).toFixed(2)),
+        price_currency: 'usd',
         pay_currency: 'usdttrc20',
         order_id: inv.id,
         order_description: `Jeerah ${purpose}`,
