@@ -486,6 +486,60 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_invoices: {
+        Row: {
+          amount_sar: number
+          applied_at: string | null
+          created_at: string
+          id: string
+          np_invoice_id: string | null
+          np_payment_id: string | null
+          pay_address: string | null
+          pay_amount: number | null
+          pay_currency: string
+          purpose: string
+          purpose_payload: Json
+          raw_ipn: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_sar: number
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          np_invoice_id?: string | null
+          np_payment_id?: string | null
+          pay_address?: string | null
+          pay_amount?: number | null
+          pay_currency?: string
+          purpose: string
+          purpose_payload?: Json
+          raw_ipn?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_sar?: number
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          np_invoice_id?: string | null
+          np_payment_id?: string | null
+          pay_address?: string | null
+          pay_amount?: number | null
+          pay_currency?: string
+          purpose?: string
+          purpose_payload?: Json
+          raw_ipn?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       points_ledger: {
         Row: {
           created_at: string
@@ -690,7 +744,10 @@ export type Database = {
       can_send_emergency: { Args: { p_user_id: string }; Returns: Json }
       check_admin_status: { Args: { p_candidate_id: string }; Returns: Json }
       complete_delivery_job: { Args: { p_job_id: string }; Returns: Json }
-      dev_topup_wallet: { Args: { p_amount: number }; Returns: Json }
+      credit_wallet_for_invoice: {
+        Args: { p_invoice_id: string }
+        Returns: Json
+      }
       perform_handshake: {
         Args: {
           _lat?: number
