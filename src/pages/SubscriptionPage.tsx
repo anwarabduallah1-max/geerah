@@ -133,15 +133,17 @@ export default function SubscriptionPage() {
                     <Check size={12} className="text-primary" /> {p}
                   </li>
                 ))}
-              </ul>
               <motion.button
                 whileTap={tapScale}
                 transition={spring.tap}
-                onClick={() => buyPlan.mutate(plan.id)}
-                disabled={buyPlan.isPending}
+                onClick={() => setPayment({ amount: plan.price, name: plan.name, type: `subscription_${plan.id}` })}
                 className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm gpu tap-fast"
               >
                 {isCurrent ? "تجديد" : "اشترك الآن"}
+              </motion.button>
+            </motion.div>
+          );
+        })}
               </motion.button>
             </motion.div>
           );
