@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,6 +8,7 @@ import { spring, tapScale, staggerContainer, staggerItem } from "@/lib/spring";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Image as ImageIcon, Coins, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
+import PlisioPaymentDialog from "@/components/PlisioPaymentDialog";
 
 type Plan = "normal" | "business";
 
@@ -80,6 +82,9 @@ export default function SubscriptionPage() {
   const points = (profile as any)?.points || 0;
   const slots = (profile as any)?.photo_slots ?? 2;
 
+  const [payment, setPayment] = useState<{ amount: number; name: string; type: string } | null>(null);
+
+
   return (
     <div className="h-full overflow-y-auto pb-24">
       <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="p-4 space-y-4">
@@ -132,8 +137,7 @@ export default function SubscriptionPage() {
               <motion.button
                 whileTap={tapScale}
                 transition={spring.tap}
-                onClick={() => buyPlan.mutate(plan.id)}
-                disabled={buyPlan.isPending}
+                onClick={() => setPayment({ amount: plan.price, name: plan.name, type: `subscription_${plan.id}` })}
                 className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm gpu tap-fast"
               >
                 {isCurrent ? "تجديد" : "اشترك الآن"}
@@ -150,12 +154,22 @@ export default function SubscriptionPage() {
               <p className="text-xs text-muted-foreground">{slots}/8 — أضف صوراً أكثر لملفك بدفعة واحدة (9 ر.س للخانة)</p>
             </div>
           </div>
-          <Button onClick={() => buySlot.mutate()} disabled={slots >= 8 || buySlot.isPending} className="w-full rounded-2xl" variant="outline">
-            شراء خانة إضافية (من المحفظة)
+          <Button onClick={() => setPayment({ amount: 9, name: "خانة صور إضافية", type: "photo_slot" })} disabled={slots >= 8} className="w-full rounded-2xl" variant="outline">
+            شراء خانة إضافية
           </Button>
         </motion.div>
       </motion.div>
 
+      {payment && (
+        <PlisioPaymentDialog
+          open={!!payment}
+          onOpenChange={(o) => !o && setPayment(null)}
+          amountSar={payment.amount}
+          orderName={payment.name}
+          paymentType={payment.type}
+          onSuccess={() => qc.invalidateQueries({ queryKey: ["my-profile"] })}
+        />
+      )}
     </div>
   );
 }
