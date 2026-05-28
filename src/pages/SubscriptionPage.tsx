@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,8 +8,7 @@ import { spring, tapScale, staggerContainer, staggerItem } from "@/lib/spring";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Image as ImageIcon, Coins, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
-
-type Plan = "normal" | "business";
+import PlisioPaymentDialog from "@/components/PlisioPaymentDialog";
 
 const PLANS: { id: Plan; name: string; price: number; perks: string[]; gradient: string; icon: any }[] = [
   {
