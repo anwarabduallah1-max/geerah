@@ -154,12 +154,23 @@ export default function SubscriptionPage() {
               <p className="text-xs text-muted-foreground">{slots}/8 — أضف صوراً أكثر لملفك بدفعة واحدة (9 ر.س للخانة)</p>
             </div>
           </div>
-          <Button onClick={() => buySlot.mutate()} disabled={slots >= 8 || buySlot.isPending} className="w-full rounded-2xl" variant="outline">
-            شراء خانة إضافية (من المحفظة)
+          <Button onClick={() => setPayment({ amount: 9, name: "خانة صور إضافية", type: "photo_slot" })} disabled={slots >= 8} className="w-full rounded-2xl" variant="outline">
+            شراء خانة إضافية
           </Button>
         </motion.div>
       </motion.div>
 
+      {payment && (
+        <PlisioPaymentDialog
+          open={!!payment}
+          onOpenChange={(o) => !o && setPayment(null)}
+          amountSar={payment.amount}
+          orderName={payment.name}
+          paymentType={payment.type}
+          onSuccess={() => qc.invalidateQueries({ queryKey: ["my-profile"] })}
+        />
+      )}
     </div>
   );
+}
 }
