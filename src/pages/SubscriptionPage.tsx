@@ -10,6 +10,8 @@ import { Crown, Sparkles, Image as ImageIcon, Coins, ArrowRight, Check } from "l
 import { toast } from "sonner";
 import PlisioPaymentDialog from "@/components/PlisioPaymentDialog";
 
+type Plan = "normal" | "business";
+
 const PLANS: { id: Plan; name: string; price: number; perks: string[]; gradient: string; icon: any }[] = [
   {
     id: "normal",
