@@ -133,6 +133,7 @@ export default function SubscriptionPage() {
                     <Check size={12} className="text-primary" /> {p}
                   </li>
                 ))}
+              </ul>
               <motion.button
                 whileTap={tapScale}
                 transition={spring.tap}
@@ -140,10 +141,6 @@ export default function SubscriptionPage() {
                 className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm gpu tap-fast"
               >
                 {isCurrent ? "تجديد" : "اشترك الآن"}
-              </motion.button>
-            </motion.div>
-          );
-        })}
               </motion.button>
             </motion.div>
           );
