@@ -135,7 +135,7 @@ export function PlisioPaymentDialog({
                 key="iframe"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={spring.smooth}
+                transition={spring.modal}
                 src={invoiceUrl}
                 className="absolute inset-0 w-full h-full border-0"
                 allow="clipboard-write; clipboard-read"
