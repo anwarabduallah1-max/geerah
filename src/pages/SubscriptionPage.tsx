@@ -82,6 +82,9 @@ export default function SubscriptionPage() {
   const points = (profile as any)?.points || 0;
   const slots = (profile as any)?.photo_slots ?? 2;
 
+  const [payment, setPayment] = useState<{ amount: number; name: string; type: string } | null>(null);
+
+
   return (
     <div className="h-full overflow-y-auto pb-24">
       <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="p-4 space-y-4">
