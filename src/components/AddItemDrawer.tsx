@@ -44,11 +44,34 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [available, setAvailable] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [photos, setPhotos] = useState<(string | null)[]>([null, null, null]);
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
 
   const resetForm = () => {
     setTitle(""); setDescription(""); setCategory("أخرى"); setCondition("good");
     setPriceType("free"); setPriceValue(""); setNafathOnly(false);
-    setSecurityDeposit(""); setAvailable(true);
+    setSecurityDeposit(""); setAvailable(true); setPhotos([null, null, null]);
+  };
+
+  const handlePickPhoto = async (idx: number, file: File | null) => {
+    if (!file || !user) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error("حجم الصورة كبير جداً (الحد 8MB)"); return; }
+    setUploadingIdx(idx);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${user.id}/${Date.now()}-${idx}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("item-images").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type || "image/jpeg",
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("item-images").getPublicUrl(path);
+      setPhotos((p) => p.map((v, i) => (i === idx ? pub.publicUrl : v)));
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message?.includes("row-level") ? "تعذر الرفع — تأكد من تسجيل الدخول" : "فشل رفع الصورة");
+    } finally {
+      setUploadingIdx(null);
+    }
   };
 
   const handleSubmit = async () => {
