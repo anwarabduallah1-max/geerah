@@ -104,6 +104,7 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
       nafath_only: nafathOnly,
       security_deposit: Number(securityDeposit) || 0,
       condition,
+      image_url: photos.find((p) => !!p) ?? null,
     } as any);
 
     setSubmitting(false);
