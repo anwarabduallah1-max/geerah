@@ -163,13 +163,32 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
                 <p className="text-sm font-bold text-foreground mb-2">صور الغرض</p>
                 <div className="flex gap-3">
                   {[0, 1, 2].map((i) => (
-                    <div key={i} className={`flex-1 aspect-square rounded-2xl border-2 border-dashed border-border bg-muted/40 flex flex-col items-center justify-center gap-1 ${i === 0 ? "border-primary/50" : ""}`}>
-                      <Camera size={18} className="text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground">{i === 0 ? "رئيسية" : `صورة ${i + 1}`}</span>
-                    </div>
+                    <label
+                      key={i}
+                      className={`relative flex-1 aspect-square rounded-2xl border-2 border-dashed bg-muted/40 flex flex-col items-center justify-center gap-1 cursor-pointer overflow-hidden transition-colors ${photos[i] ? "border-primary" : i === 0 ? "border-primary/50" : "border-border"}`}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => handlePickPhoto(i, e.target.files?.[0] ?? null)}
+                      />
+                      {photos[i] ? (
+                        <img src={photos[i]!} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : uploadingIdx === i ? (
+                        <Loader2 size={18} className="text-primary animate-spin" />
+                      ) : (
+                        <>
+                          <Camera size={18} className="text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground">{i === 0 ? "رئيسية" : `صورة ${i + 1}`}</span>
+                        </>
+                      )}
+                    </label>
                   ))}
                 </div>
               </div>
+
 
               {/* Title */}
               <div className="mt-4">
