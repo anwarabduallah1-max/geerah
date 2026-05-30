@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
 import { Onboarding } from "@/components/Onboarding";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import MapPage from "./pages/MapPage";
 import NeighborsPage from "./pages/NeighborsPage";
 import ChatsPage from "./pages/ChatsPage";
@@ -25,6 +25,62 @@ const queryClient = new QueryClient({
   },
 });
 
+const TAB_PATHS = ["/", "/neighbors", "/chats", "/profile"] as const;
+type TabPath = (typeof TAB_PATHS)[number];
+
+// Each tab page is memoized and mounted ONCE — switching tabs only toggles
+// visibility, so the map, profile data, and lists stay warm in memory.
+const MemoMap = memo(MapPage);
+const MemoNeighbors = memo(NeighborsPage);
+const MemoChats = memo(ChatsPage);
+const MemoProfile = memo(ProfilePage);
+
+const TabPane = ({ active, children }: { active: boolean; children: React.ReactNode }) => (
+  <div
+    aria-hidden={!active}
+    className="absolute inset-0"
+    style={{
+      visibility: active ? "visible" : "hidden",
+      pointerEvents: active ? "auto" : "none",
+      // keep layout but hide from paint cost when inactive
+      contain: active ? "none" : "strict",
+    }}
+  >
+    {children}
+  </div>
+);
+
+const AppShell = () => {
+  const { pathname } = useLocation();
+  const currentTab = (TAB_PATHS as readonly string[]).includes(pathname)
+    ? (pathname as TabPath)
+    : null;
+
+  return (
+    <div className="h-svh flex flex-col overflow-hidden w-full pb-16">
+      <main className="flex-1 relative overflow-hidden">
+        {/* Persistent tab panes — mounted once, toggled via CSS for instant switching */}
+        <TabPane active={currentTab === "/"}><MemoMap /></TabPane>
+        <TabPane active={currentTab === "/neighbors"}><MemoNeighbors /></TabPane>
+        <TabPane active={currentTab === "/chats"}><MemoChats /></TabPane>
+        <TabPane active={currentTab === "/profile"}><MemoProfile /></TabPane>
+
+        {/* Non-tab routes render on top */}
+        {!currentTab && (
+          <div className="absolute inset-0 overflow-auto">
+            <Routes>
+              <Route path="/subscription" element={<SubscriptionPage />} />
+              <Route path="/business" element={<BusinessHubPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+        )}
+      </main>
+      <BottomNav />
+    </div>
+  );
+};
+
 const App = () => {
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem("jeerah_onboarded");
@@ -35,7 +91,6 @@ const App = () => {
     setShowOnboarding(false);
   };
 
-  // Light "Jark" community palette by default; respect dark mode if user/system requests
   useEffect(() => {
     document.documentElement.classList.remove("dark");
   }, []);
@@ -47,23 +102,7 @@ const App = () => {
         <AuthProvider>
           <BrowserRouter>
             {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
-            <div className="h-svh flex flex-col overflow-hidden w-full pb-16">
-              <main className="flex-1 overflow-hidden">
-                <Routes>
-                  <Route path="/" element={<MapPage />} />
-                  <Route path="/add-item" element={<Navigate to="/" replace />} />
-                  <Route path="/neighbors" element={<NeighborsPage />} />
-                  <Route path="/chats" element={<ChatsPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/subscription" element={<SubscriptionPage />} />
-                  <Route path="/business" element={<BusinessHubPage />} />
-                  <Route path="/jeera-box" element={<Navigate to="/neighbors" replace />} />
-                  <Route path="/delivery" element={<Navigate to="/" replace />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-              <BottomNav />
-            </div>
+            <AppShell />
           </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>
