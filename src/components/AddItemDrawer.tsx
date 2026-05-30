@@ -44,11 +44,34 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [available, setAvailable] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [photos, setPhotos] = useState<(string | null)[]>([null, null, null]);
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
 
   const resetForm = () => {
     setTitle(""); setDescription(""); setCategory("أخرى"); setCondition("good");
     setPriceType("free"); setPriceValue(""); setNafathOnly(false);
-    setSecurityDeposit(""); setAvailable(true);
+    setSecurityDeposit(""); setAvailable(true); setPhotos([null, null, null]);
+  };
+
+  const handlePickPhoto = async (idx: number, file: File | null) => {
+    if (!file || !user) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error("حجم الصورة كبير جداً (الحد 8MB)"); return; }
+    setUploadingIdx(idx);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${user.id}/${Date.now()}-${idx}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("item-images").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type || "image/jpeg",
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("item-images").getPublicUrl(path);
+      setPhotos((p) => p.map((v, i) => (i === idx ? pub.publicUrl : v)));
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message?.includes("row-level") ? "تعذر الرفع — تأكد من تسجيل الدخول" : "فشل رفع الصورة");
+    } finally {
+      setUploadingIdx(null);
+    }
   };
 
   const handleSubmit = async () => {
@@ -81,6 +104,7 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
       nafath_only: nafathOnly,
       security_deposit: Number(securityDeposit) || 0,
       condition,
+      image_url: photos.find((p) => !!p) ?? null,
     } as any);
 
     setSubmitting(false);
@@ -139,13 +163,32 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
                 <p className="text-sm font-bold text-foreground mb-2">صور الغرض</p>
                 <div className="flex gap-3">
                   {[0, 1, 2].map((i) => (
-                    <div key={i} className={`flex-1 aspect-square rounded-2xl border-2 border-dashed border-border bg-muted/40 flex flex-col items-center justify-center gap-1 ${i === 0 ? "border-primary/50" : ""}`}>
-                      <Camera size={18} className="text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground">{i === 0 ? "رئيسية" : `صورة ${i + 1}`}</span>
-                    </div>
+                    <label
+                      key={i}
+                      className={`relative flex-1 aspect-square rounded-2xl border-2 border-dashed bg-muted/40 flex flex-col items-center justify-center gap-1 cursor-pointer overflow-hidden transition-colors ${photos[i] ? "border-primary" : i === 0 ? "border-primary/50" : "border-border"}`}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => handlePickPhoto(i, e.target.files?.[0] ?? null)}
+                      />
+                      {photos[i] ? (
+                        <img src={photos[i]!} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : uploadingIdx === i ? (
+                        <Loader2 size={18} className="text-primary animate-spin" />
+                      ) : (
+                        <>
+                          <Camera size={18} className="text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground">{i === 0 ? "رئيسية" : `صورة ${i + 1}`}</span>
+                        </>
+                      )}
+                    </label>
                   ))}
                 </div>
               </div>
+
 
               {/* Title */}
               <div className="mt-4">

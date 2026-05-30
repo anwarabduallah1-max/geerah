@@ -14,7 +14,16 @@ import SubscriptionPage from "./pages/SubscriptionPage";
 import BusinessHubPage from "./pages/BusinessHubPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 10,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => {
   const [showOnboarding, setShowOnboarding] = useState(() => {
