@@ -130,12 +130,18 @@ export default function ProfilePage() {
     <div className="h-full overflow-y-auto pb-20">
       <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="p-4">
         <motion.div variants={staggerItem} transition={spring.staggerChild} className="bg-card rounded-3xl border border-border p-6 text-center mb-4">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3"><span className="text-3xl">👤</span></div>
-          <h1 className="text-lg font-bold">{user.user_metadata?.username || "جار جديد"}</h1>
-          <p className="text-xs text-muted-foreground mt-1">{user.email}</p>
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3 overflow-hidden">
+            {(profile as any)?.avatar_url ? (
+              <img src={(profile as any).avatar_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span className="text-3xl">👤</span>
+            )}
+          </div>
+          <h1 className="text-lg font-bold">{(profile as any)?.username || user.user_metadata?.username || "جار جديد"}</h1>
+          <p className="text-xs text-muted-foreground mt-1">{user.email || "—"}</p>
           <div className="flex items-center justify-center gap-4 mt-3">
             <div className="flex items-center gap-1"><Star size={14} className="text-secondary" /><span className="text-sm font-medium">{trustScore}</span></div>
-            <div className="flex items-center gap-1"><Package size={14} className="text-primary" /><span className="text-sm font-medium">{itemCount || 0}/{tierLimits[tier]} أغراض</span></div>
+            <div className="flex items-center gap-1"><Package size={14} className="text-primary" /><span className="text-sm font-medium">{itemCount ?? 0}/{tierLimits[tier]} أغراض</span></div>
             <div className="flex items-center gap-1"><Coins size={14} className="text-primary" /><span className="text-sm font-medium">{points} نقطة</span></div>
           </div>
           <span className="inline-block mt-2 px-3 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">{tierLabels[tier]}</span>
