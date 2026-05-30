@@ -23,15 +23,21 @@ export default function ProfilePage() {
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
     enabled: !!user,
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("*").eq("user_id", user!.id).single();
-      return data;
+      const { data } = await supabase.from("profiles").select("*").eq("user_id", user!.id).maybeSingle();
+      return data ?? null;
     },
   });
 
   const { data: itemCount } = useQuery({
     queryKey: ["my-items-count", user?.id],
     enabled: !!user,
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       const { count } = await supabase.from("items").select("*", { count: "exact", head: true }).eq("owner_id", user!.id);
       return count || 0;
