@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useCallback, memo } from "react";
+import { useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FloatingSearch } from "@/components/FloatingSearch";
 import { FazaaButton } from "@/components/FazaaButton";
@@ -15,12 +15,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { spring, tapScale } from "@/lib/spring";
 import type { Tables } from "@/integrations/supabase/types";
+import { MapView } from "@/components/MapView";
 
 type Item = Tables<"items">;
-
-const MapView = lazy(() =>
-  import("@/components/MapView").then((m) => ({ default: m.MapView }))
-);
 
 const FilterToggle = memo(({ mode, onChange }: { mode: "public" | "private"; onChange: (m: "public" | "private") => void }) => (
   <div className="flex rounded-full glass-strong shadow-soft-md p-0.5 w-40 mx-auto gpu">
@@ -108,16 +105,9 @@ export default function MapPage() {
     <div className="relative w-full h-full gpu">
       {/* Map fills the container — isolated from overlays for stable repaints */}
       <div className="absolute inset-0 z-[1] layer-isolate">
-        <Suspense
-          fallback={
-            <div className="h-full flex items-center justify-center bg-muted/30">
-              <Loader2 size={32} className="animate-spin text-primary" />
-            </div>
-          }
-        >
-          <MapView items={filteredItems} onItemSelect={handleItemSelect} />
-        </Suspense>
+        <MapView items={filteredItems} onItemSelect={handleItemSelect} />
       </div>
+
 
       {/* Floating search - tap opens global search */}
       <div className="absolute top-4 left-4 right-4 z-[30]" onClick={() => setShowGlobalSearch(true)}>
