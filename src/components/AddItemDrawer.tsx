@@ -53,26 +53,59 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
     setSecurityDeposit(""); setAvailable(true); setPhotos([null, null, null]);
   };
 
+  const downscaleImage = (file: File, maxDim = 1600, quality = 0.82): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(url); return reject(new Error("no canvas")); }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(url);
+            blob ? resolve(blob) : reject(new Error("toBlob failed"));
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+      img.src = url;
+    });
+
   const handlePickPhoto = async (idx: number, file: File | null) => {
     if (!file || !user) return;
-    if (file.size > 8 * 1024 * 1024) { toast.error("حجم الصورة كبير جداً (الحد 8MB)"); return; }
+    if (file.size > 20 * 1024 * 1024) { toast.error("حجم الصورة كبير جداً (الحد 20MB)"); return; }
+    // Instant local preview so the UI feels native
+    const previewUrl = URL.createObjectURL(file);
+    setPhotos((p) => p.map((v, i) => (i === idx ? previewUrl : v)));
     setUploadingIdx(idx);
     try {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `${user.id}/${Date.now()}-${idx}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("item-images").upload(path, file, {
-        cacheControl: "3600", upsert: false, contentType: file.type || "image/jpeg",
+      // Downscale in parallel with showing the preview — much faster upload
+      const blob = await downscaleImage(file).catch(() => file);
+      const path = `${user.id}/${Date.now()}-${idx}.jpg`;
+      const { error: upErr } = await supabase.storage.from("item-images").upload(path, blob, {
+        cacheControl: "3600", upsert: false, contentType: "image/jpeg",
       });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("item-images").getPublicUrl(path);
       setPhotos((p) => p.map((v, i) => (i === idx ? pub.publicUrl : v)));
+      URL.revokeObjectURL(previewUrl);
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message?.includes("row-level") ? "تعذر الرفع — تأكد من تسجيل الدخول" : "فشل رفع الصورة");
+      setPhotos((p) => p.map((v, i) => (i === idx ? null : v)));
     } finally {
       setUploadingIdx(null);
     }
   };
+
 
   const handleSubmit = async () => {
     if (!user) { toast.error("يجب تسجيل الدخول أولاً"); return; }
