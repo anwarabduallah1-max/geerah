@@ -105,15 +105,9 @@ export default function MapPage() {
     <div className="relative w-full h-full gpu">
       {/* Map fills the container — isolated from overlays for stable repaints */}
       <div className="absolute inset-0 z-[1] layer-isolate">
-        <Suspense
-          fallback={
-            <div className="h-full flex items-center justify-center bg-muted/30">
-              <Loader2 size={32} className="animate-spin text-primary" />
-            </div>
-          }
-        >
-          <MapView items={filteredItems} onItemSelect={handleItemSelect} />
-        </Suspense>
+        <MapView items={filteredItems} onItemSelect={handleItemSelect} />
+      </div>
+
       </div>
 
       {/* Floating search - tap opens global search */}
