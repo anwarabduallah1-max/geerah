@@ -135,21 +135,7 @@ function MapViewInner({ items, onItemSelect }: MapViewProps) {
     const userLat = locationMarker.current?.getLatLng()?.lat;
     const userLng = locationMarker.current?.getLatLng()?.lng;
 
-    const demoMarker = L.marker([35.952, 39.012], {
-      icon: createItemIcon("demo"),
-    });
-    demoMarker.on("click", () => {
-      const el = demoMarker.getElement();
-      if (el) {
-        el.style.transition = "transform 0.3s cubic-bezier(0.34,1.56,0.64,1)";
-        el.style.transform = "scale(1.3)";
-        setTimeout(() => { el.style.transform = "scale(1)"; }, 300);
-      }
-      toast("طلب استعارة أداة", {
-        description: "هذا دبوس تجريبي — جارك يحتاج مثقاب كهربائي!",
-      });
-    });
-    markersLayer.current.addLayer(demoMarker);
+
 
     items
       .filter((i) => i.location_lat && i.location_lng)

@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FloatingSearch } from "@/components/FloatingSearch";
 import { FazaaButton } from "@/components/FazaaButton";
@@ -90,6 +90,23 @@ export default function MapPage() {
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
+
+  // Auto-center map on user's GPS on mount
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        window.dispatchEvent(
+          new CustomEvent("locate-me", {
+            detail: { lng: pos.coords.longitude, lat: pos.coords.latitude },
+          })
+        );
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  }, []);
+
 
   const handleRequest = (itemId: string) => {
     if (!user) {
