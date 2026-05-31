@@ -38,11 +38,11 @@ const MemoProfile = memo(ProfilePage);
 const TabPane = ({ active, children }: { active: boolean; children: React.ReactNode }) => (
   <div
     aria-hidden={!active}
-    className="absolute inset-0"
+    className="absolute inset-0 transition-opacity duration-200 ease-out"
     style={{
+      opacity: active ? 1 : 0,
       visibility: active ? "visible" : "hidden",
       pointerEvents: active ? "auto" : "none",
-      // keep layout but hide from paint cost when inactive
       contain: active ? "none" : "strict",
     }}
   >
