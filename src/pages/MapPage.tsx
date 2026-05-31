@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useCallback, memo } from "react";
+import { useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FloatingSearch } from "@/components/FloatingSearch";
 import { FazaaButton } from "@/components/FazaaButton";
@@ -15,12 +15,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { spring, tapScale } from "@/lib/spring";
 import type { Tables } from "@/integrations/supabase/types";
+import { MapView } from "@/components/MapView";
 
 type Item = Tables<"items">;
-
-const MapView = lazy(() =>
-  import("@/components/MapView").then((m) => ({ default: m.MapView }))
-);
 
 const FilterToggle = memo(({ mode, onChange }: { mode: "public" | "private"; onChange: (m: "public" | "private") => void }) => (
   <div className="flex rounded-full glass-strong shadow-soft-md p-0.5 w-40 mx-auto gpu">
