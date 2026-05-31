@@ -108,7 +108,6 @@ export default function MapPage() {
         <MapView items={filteredItems} onItemSelect={handleItemSelect} />
       </div>
 
-      </div>
 
       {/* Floating search - tap opens global search */}
       <div className="absolute top-4 left-4 right-4 z-[30]" onClick={() => setShowGlobalSearch(true)}>
