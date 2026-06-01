@@ -737,6 +737,35 @@ export type Database = {
         Args: { p_approve: boolean; p_candidate_id: string }
         Returns: Json
       }
+      admin_list_profiles: {
+        Args: { _limit?: number; _only_pending?: boolean }
+        Returns: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          id: string
+          is_admin: boolean
+          is_verified: boolean
+          location_lat: number | null
+          location_lng: number | null
+          photo_slots: number
+          points: number
+          subscription_expires_at: string | null
+          subscription_type: string
+          tier: string
+          trust_score: number
+          updated_at: string
+          user_id: string
+          username: string
+          wallet_balance: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       boost_target: {
         Args: { p_points: number; p_target_id: string; p_target_type: string }
         Returns: Json
