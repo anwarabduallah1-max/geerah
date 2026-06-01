@@ -748,6 +748,35 @@ export type Database = {
         Args: { p_invoice_id: string }
         Returns: Json
       }
+      get_my_profile: {
+        Args: never
+        Returns: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          id: string
+          is_admin: boolean
+          is_verified: boolean
+          location_lat: number | null
+          location_lng: number | null
+          photo_slots: number
+          points: number
+          subscription_expires_at: string | null
+          subscription_type: string
+          tier: string
+          trust_score: number
+          updated_at: string
+          user_id: string
+          username: string
+          wallet_balance: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       perform_handshake: {
         Args: {
           _lat?: number
