@@ -27,9 +27,10 @@ export default function ProfilePage() {
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("*").eq("user_id", user!.id).maybeSingle();
-      return data ?? null;
+      const { data } = await supabase.rpc("get_my_profile");
+      return (data as any[])?.[0] ?? null;
     },
+
   });
 
   const { data: itemCount } = useQuery({

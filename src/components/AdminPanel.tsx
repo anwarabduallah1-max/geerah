@@ -20,17 +20,19 @@ export function AdminPanel() {
       approvals?.forEach((a: any) => { counts[a.candidate_id] = (counts[a.candidate_id] || 0) + 1; });
       const pendingIds = Object.entries(counts).filter(([, c]) => c >= 5).map(([id]) => id);
       if (pendingIds.length === 0) return [];
-      const { data: profs } = await supabase.from("profiles").select("*").in("user_id", pendingIds).eq("is_admin", false);
-      return (profs || []).map((p: any) => ({ ...p, votes: counts[p.user_id] || 0 }));
+      const { data: profs } = await supabase.rpc("admin_list_profiles", { _only_pending: true, _limit: 500 });
+      return ((profs as any[]) || []).filter((p) => pendingIds.includes(p.user_id)).map((p: any) => ({ ...p, votes: counts[p.user_id] || 0 }));
     },
+
   });
 
   const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ["admin-members"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("*").order("trust_score", { ascending: false }).limit(200);
-      return data || [];
+      const { data } = await supabase.rpc("admin_list_profiles", { _only_pending: false, _limit: 200 });
+      return (data as any[]) || [];
     },
+
     enabled: sub === "members",
   });
 

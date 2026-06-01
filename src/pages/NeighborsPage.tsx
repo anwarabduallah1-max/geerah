@@ -28,9 +28,10 @@ function useNeighbors() {
     queryFn: async () => {
       const { data: profiles, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, user_id, username, avatar_url, bio, is_verified, trust_score, photo_slots, created_at, updated_at, location_lat, location_lng")
         .neq("user_id", user?.id ?? "")
         .order("trust_score", { ascending: false });
+
 
       if (error) throw error;
 
@@ -75,9 +76,10 @@ function useMyProfile() {
   return useQuery({
     queryKey: ["my-profile", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("*").eq("user_id", user!.id).single();
-      return data;
+      const { data } = await supabase.rpc("get_my_profile");
+      return (data as any[])?.[0] ?? null;
     },
+
     enabled: !!user,
   });
 }
