@@ -19,9 +19,10 @@ export function WalletCard() {
     queryKey: ["my-profile", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("*").eq("user_id", user!.id).single();
-      return data;
+      const { data } = await supabase.rpc("get_my_profile");
+      return (data as any[])?.[0] ?? null;
     },
+
   });
 
   const { data: txs = [] } = useQuery({

@@ -114,7 +114,9 @@ export const AddItemDrawer = ({ isOpen, onClose }: AddItemDrawerProps) => {
     setSubmitting(true);
 
     // Check tier limits
-    const { data: profile } = await supabase.from("profiles").select("tier").eq("user_id", user.id).single();
+    const { data: myProfile } = await supabase.rpc("get_my_profile");
+    const profile = (myProfile as any[])?.[0];
+
     const tier = (profile as any)?.tier || "free";
     const limits: Record<string, number> = { free: 2, regular: 4, business: 999 };
     const maxItems = limits[tier] || 2;
