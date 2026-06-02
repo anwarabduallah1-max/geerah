@@ -113,26 +113,32 @@ export type Database = {
       conversations: {
         Row: {
           buyer_id: string
+          buyer_last_read_at: string
           created_at: string
           id: string
           item_id: string | null
           seller_id: string
+          seller_last_read_at: string
           updated_at: string
         }
         Insert: {
           buyer_id: string
+          buyer_last_read_at?: string
           created_at?: string
           id?: string
           item_id?: string | null
           seller_id: string
+          seller_last_read_at?: string
           updated_at?: string
         }
         Update: {
           buyer_id?: string
+          buyer_last_read_at?: string
           created_at?: string
           id?: string
           item_id?: string | null
           seller_id?: string
+          seller_last_read_at?: string
           updated_at?: string
         }
         Relationships: [
@@ -777,6 +783,10 @@ export type Database = {
         Args: { p_invoice_id: string }
         Returns: Json
       }
+      decide_item_request: {
+        Args: { p_approve: boolean; p_request_id: string }
+        Returns: Json
+      }
       get_my_profile: {
         Args: never
         Returns: {
@@ -805,6 +815,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      mark_conversation_read: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
       }
       perform_handshake: {
         Args: {
