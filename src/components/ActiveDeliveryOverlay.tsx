@@ -1,30 +1,31 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Truck, MapPin, Clock, ChevronUp, ChevronDown, ExternalLink, X, Phone } from "lucide-react";
+import { Truck, Clock, ChevronUp, ChevronDown, X, Phone, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
-import { spring } from "@/lib/spring";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 /**
- * Shows active delivery tracking as a bottom sheet over the map
- * when the user has a request that has been approved (accepted by a courier).
+ * Bottom-sheet overlay on the map showing the user's active delivery job
+ * (either as requester or as the worker delivering it).
  */
 export function ActiveDeliveryOverlay() {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  const { data: activeDelivery } = useQuery({
-    queryKey: ["active-delivery", user?.id],
+  const { data: activeJob } = useQuery({
+    queryKey: ["active-delivery-job", user?.id],
     enabled: !!user,
     refetchInterval: 15000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("delivery_requests")
+        .from("delivery_jobs")
         .select("*")
-        .eq("requester_id", user!.id)
-        .in("status", ["accepted", "picked_up"])
+        .or(`requester_id.eq.${user!.id},worker_id.eq.${user!.id}`)
+        .in("status", ["accepted"])
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -33,23 +34,45 @@ export function ActiveDeliveryOverlay() {
     },
   });
 
-  const { data: courier } = useQuery({
-    queryKey: ["courier", activeDelivery?.courier_id],
-    enabled: !!activeDelivery?.courier_id,
+  // Realtime invalidation
+  useEffect(() => {
+    if (!user) return;
+    const ch = supabase
+      .channel(`delivery-jobs-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "delivery_jobs" },
+        () => qc.invalidateQueries({ queryKey: ["active-delivery-job", user.id] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user, qc]);
+
+  const { data: worker } = useQuery({
+    queryKey: ["delivery-worker", activeJob?.worker_id],
+    enabled: !!activeJob?.worker_id,
     queryFn: async () => {
       const { data } = await supabase
         .from("profiles")
         .select("username, avatar_url, trust_score")
-        .eq("user_id", activeDelivery!.courier_id!)
+        .eq("user_id", activeJob!.worker_id!)
         .maybeSingle();
       return data;
     },
   });
 
-  if (!activeDelivery || dismissed) return null;
+  if (!activeJob || dismissed) return null;
 
-  const statusLabel = activeDelivery.status === "picked_up" ? "في الطريق إليك" : "تم القبول — قيد الاستلام";
-  const eta = activeDelivery.status === "picked_up" ? "~10 دقائق" : "~20 دقيقة";
+  const isWorker = activeJob.worker_id === user?.id;
+
+  const complete = async () => {
+    const { data, error } = await supabase.rpc("complete_delivery_job", { p_job_id: activeJob.id });
+    if (error) { toast.error(error.message); return; }
+    const r = data as any;
+    if (!r?.success) { toast.error(r?.error || "تعذّر الإنجاز"); return; }
+    toast.success(`تم الإنجاز — عمولة ${r.commission} ر.س`);
+    qc.invalidateQueries({ queryKey: ["active-delivery-job", user?.id] });
+    qc.invalidateQueries({ queryKey: ["delivery-jobs"] });
+    qc.invalidateQueries({ queryKey: ["my-profile"] });
+  };
 
   return (
     <AnimatePresence>
@@ -61,7 +84,6 @@ export function ActiveDeliveryOverlay() {
         className="absolute bottom-20 left-3 right-3 z-[40] bg-card/95 backdrop-blur-lg rounded-3xl border border-border shadow-2xl overflow-hidden"
         style={{ transform: "translate3d(0,0,0)" }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
@@ -69,7 +91,7 @@ export function ActiveDeliveryOverlay() {
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground leading-tight">توصيل نشط</p>
-              <p className="text-xs font-bold text-foreground leading-tight">{statusLabel}</p>
+              <p className="text-xs font-bold text-foreground leading-tight">{isWorker ? "أنت توصّل هذا الطلب" : "قيد التوصيل"}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -92,32 +114,24 @@ export function ActiveDeliveryOverlay() {
             >
               <div className="px-4 pb-4 space-y-3">
                 <div className="bg-muted/40 rounded-2xl p-3">
-                  <p className="text-xs font-bold mb-2 text-foreground">{activeDelivery.title}</p>
-                  <div className="space-y-1.5 text-[11px]">
-                    <div className="flex items-center gap-2">
-                      <MapPin size={12} className="text-green-600 shrink-0" />
-                      <span className="text-muted-foreground truncate">{activeDelivery.pickup_address}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin size={12} className="text-destructive shrink-0" />
-                      <span className="text-muted-foreground truncate">{activeDelivery.dropoff_address}</span>
-                    </div>
-                  </div>
+                  <p className="text-xs font-bold mb-1 text-foreground">{activeJob.title}</p>
+                  {activeJob.description && (
+                    <p className="text-[11px] text-muted-foreground line-clamp-2">{activeJob.description}</p>
+                  )}
                 </div>
 
-                {/* Courier info */}
-                {courier && (
+                {worker && !isWorker && (
                   <div className="flex items-center gap-3 bg-muted/40 rounded-2xl p-3">
                     <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center overflow-hidden">
-                      {courier.avatar_url ? (
-                        <img src={courier.avatar_url} alt={courier.username} className="w-full h-full object-cover" />
+                      {worker.avatar_url ? (
+                        <img src={worker.avatar_url} alt={worker.username} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-lg">👤</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold truncate">{courier.username}</p>
-                      <p className="text-[10px] text-muted-foreground">الموصّل • ثقة {courier.trust_score}</p>
+                      <p className="text-xs font-bold truncate">{worker.username}</p>
+                      <p className="text-[10px] text-muted-foreground">الموصّل • ثقة {worker.trust_score}</p>
                     </div>
                     <button className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                       <Phone size={14} />
@@ -125,27 +139,21 @@ export function ActiveDeliveryOverlay() {
                   </div>
                 )}
 
-                {/* ETA + Fee */}
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Clock size={13} className="text-primary" />
-                    <span>الوصول خلال <span className="font-bold text-foreground">{eta}</span></span>
+                    <span>قيد التنفيذ</span>
                   </div>
-                  <span className="font-bold text-primary">
-                    {activeDelivery.fee && Number(activeDelivery.fee) > 0 ? `${activeDelivery.fee} ر.س` : "مجاني"}
-                  </span>
+                  <span className="font-bold text-primary">{Number(activeJob.price).toFixed(2)} ر.س</span>
                 </div>
 
-                {/* Pay link */}
-                {activeDelivery.payment_link && Number(activeDelivery.fee) > 0 && (
-                  <a
-                    href={activeDelivery.payment_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {isWorker && (
+                  <button
+                    onClick={complete}
                     className="w-full h-10 rounded-2xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5"
                   >
-                    <ExternalLink size={14} /> ادفع للموصّل
-                  </a>
+                    <CheckCircle2 size={14} /> إنجاز التوصيل
+                  </button>
                 )}
               </div>
             </motion.div>
