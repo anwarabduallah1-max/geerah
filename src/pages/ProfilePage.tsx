@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { spring, staggerContainer, staggerItem } from "@/lib/spring";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { OwnerRequestsPanel } from "@/components/OwnerRequestsPanel";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
