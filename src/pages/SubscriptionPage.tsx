@@ -8,7 +8,7 @@ import { spring, tapScale, staggerContainer, staggerItem } from "@/lib/spring";
 import { Button } from "@/components/ui/button";
 import { Crown, Sparkles, Image as ImageIcon, Coins, ArrowRight, Check } from "lucide-react";
 import { toast } from "sonner";
-import PlisioPaymentDialog from "@/components/PlisioPaymentDialog";
+import { CryptoPaymentDialog } from "@/components/CryptoPaymentDialog";
 
 type Plan = "normal" | "business";
 
@@ -83,7 +83,11 @@ export default function SubscriptionPage() {
   const points = (profile as any)?.points || 0;
   const slots = (profile as any)?.photo_slots ?? 2;
 
-  const [payment, setPayment] = useState<{ amount: number; name: string; type: string } | null>(null);
+  const [payment, setPayment] = useState<
+    | { amountSar: number; title: string; purpose: "subscription" | "photo_slot"; payload: Record<string, unknown> }
+    | null
+  >(null);
+
 
 
   return (
@@ -138,7 +142,7 @@ export default function SubscriptionPage() {
               <motion.button
                 whileTap={tapScale}
                 transition={spring.tap}
-                onClick={() => setPayment({ amount: plan.price, name: plan.name, type: `subscription_${plan.id}` })}
+                onClick={() => setPayment({ amountSar: plan.price, title: plan.name, purpose: "subscription", payload: { plan: plan.id } })}
                 className="w-full h-11 rounded-2xl bg-primary text-primary-foreground font-bold text-sm gpu tap-fast"
               >
                 {isCurrent ? "تجديد" : "اشترك الآن"}
@@ -155,22 +159,25 @@ export default function SubscriptionPage() {
               <p className="text-xs text-muted-foreground">{slots}/8 — أضف صوراً أكثر لملفك بدفعة واحدة (9 ر.س للخانة)</p>
             </div>
           </div>
-          <Button onClick={() => setPayment({ amount: 9, name: "خانة صور إضافية", type: "photo_slot" })} disabled={slots >= 8} className="w-full rounded-2xl" variant="outline">
+          <Button onClick={() => setPayment({ amountSar: 9, title: "خانة صور إضافية", purpose: "photo_slot", payload: { slots: 1 } })} disabled={slots >= 8} className="w-full rounded-2xl" variant="outline">
             شراء خانة إضافية
           </Button>
+
         </motion.div>
       </motion.div>
 
       {payment && (
-        <PlisioPaymentDialog
+        <CryptoPaymentDialog
           open={!!payment}
           onOpenChange={(o) => !o && setPayment(null)}
-          amountSar={payment.amount}
-          orderName={payment.name}
-          paymentType={payment.type}
-          onSuccess={() => qc.invalidateQueries({ queryKey: ["my-profile"] })}
+          title={payment.title}
+          amountSar={payment.amountSar}
+          purpose={payment.purpose}
+          payload={payment.payload}
+          onConfirmed={() => qc.invalidateQueries({ queryKey: ["my-profile"] })}
         />
       )}
+
     </div>
   );
 }
