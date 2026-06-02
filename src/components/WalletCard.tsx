@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 export function WalletCard() {
   const { user } = useAuth();
   const [topupOpen, setTopupOpen] = useState(false);
-  const [amount, setAmount] = useState<number>(50);
+  const [amount, setAmount] = useState<number>(150);
   const [confirmed, setConfirmed] = useState(false);
 
   const { data: profile } = useQuery({
