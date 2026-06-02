@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,8 @@ interface ConversationRow {
   buyer_id: string;
   seller_id: string;
   updated_at: string;
+  buyer_last_read_at: string;
+  seller_last_read_at: string;
   items: { title: string } | null;
 }
 
@@ -21,23 +23,30 @@ export default function ChatsPage() {
   const [loading, setLoading] = useState(true);
   const [activeChat, setActiveChat] = useState<{ itemId?: string; itemTitle: string; sellerId: string } | null>(null);
 
+  const load = useCallback(async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("id, item_id, buyer_id, seller_id, updated_at, buyer_last_read_at, seller_last_read_at, items(title)")
+      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      .order("updated_at", { ascending: false });
+    if (!error && data) setConversations(data as unknown as ConversationRow[]);
+    setLoading(false);
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
-    const load = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("conversations")
-        .select("id, item_id, buyer_id, seller_id, updated_at, items(title)")
-        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-        .order("updated_at", { ascending: false });
-
-      if (!error && data) {
-        setConversations(data as unknown as ConversationRow[]);
-      }
-      setLoading(false);
-    };
+    setLoading(true);
     load();
-  }, [user]);
+    // Realtime: refresh list on any new message or conversation update
+    const channel = supabase
+      .channel(`chats-list-${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => load())
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, () => load())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversations" }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, load]);
 
   if (!user) {
     return (
@@ -73,6 +82,8 @@ export default function ChatsPage() {
               const isbuyer = conv.buyer_id === user.id;
               const otherLabel = isbuyer ? "البائع" : "المشتري";
               const itemTitle = conv.items?.title || "غرض محذوف";
+              const myLastRead = isbuyer ? conv.buyer_last_read_at : conv.seller_last_read_at;
+              const unread = new Date(conv.updated_at).getTime() > new Date(myLastRead).getTime();
 
               return (
                 <motion.div
@@ -82,17 +93,20 @@ export default function ChatsPage() {
                   onClick={() =>
                     setActiveChat({
                       itemId: conv.item_id || undefined,
-                      itemTitle: itemTitle,
+                      itemTitle,
                       sellerId: conv.seller_id,
                     })
                   }
                   className="bg-card rounded-3xl border border-border p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow"
                 >
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="relative w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <MessageCircle size={20} className="text-primary" />
+                    {unread && (
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-destructive border-2 border-card" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{itemTitle}</p>
+                    <p className={`text-sm truncate ${unread ? "font-extrabold" : "font-bold"}`}>{itemTitle}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">محادثة مع {otherLabel}</p>
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0">
@@ -108,7 +122,7 @@ export default function ChatsPage() {
       {activeChat && (
         <ChatModal
           isOpen={!!activeChat}
-          onClose={() => setActiveChat(null)}
+          onClose={() => { setActiveChat(null); load(); }}
           itemId={activeChat.itemId}
           itemTitle={activeChat.itemTitle}
           sellerId={activeChat.sellerId}

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { spring, staggerContainer, staggerItem } from "@/lib/spring";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { OwnerRequestsPanel } from "@/components/OwnerRequestsPanel";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -156,6 +157,8 @@ export default function ProfilePage() {
           </div>
           <Button size="sm" className="rounded-3xl text-xs active:scale-[0.97]" onClick={() => navigate("/subscription")}>اشترك</Button>
         </motion.div>
+
+        <OwnerRequestsPanel />
 
         <motion.div variants={staggerItem} transition={spring.staggerChild} className="bg-gradient-to-l from-primary/10 to-secondary/10 rounded-3xl border border-primary/20 p-4 mb-4 flex items-center gap-3">
           <Sparkles size={24} className="text-primary" />
