@@ -85,12 +85,14 @@ export const ChatModal = ({ isOpen, onClose, itemId, itemTitle, sellerId }: Chat
 
   useEffect(() => {
     if (!conversationId) return;
+    supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
     const channel = supabase
       .channel(`messages-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
           const newMsg = payload.new as Message;
           setMessages((prev) => prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+          supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId });
         }
       )
       .subscribe();
