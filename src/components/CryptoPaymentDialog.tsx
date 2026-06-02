@@ -69,15 +69,24 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
     return () => { cancelled = true; };
   }, [open, purpose, amountSar]);
 
-  // Poll status
+  // Poll invoice status directly from the payment_invoices table (RLS scopes to owner)
   useEffect(() => {
     if (!invoice) return;
+    let active = true;
     const poll = async () => {
-      const { data, error } = await supabase.functions.invoke("nowpayments-invoice-status", {
-        body: { id: invoice.invoice_id },
-      });
-      if (error || !data) return;
-      const s = (data as any).status as Status;
+      const { data } = await supabase
+        .from("payment_invoices")
+        .select("status")
+        .eq("id", invoice.invoice_id)
+        .maybeSingle();
+      if (!active || !data) return;
+      const raw = data.status as string;
+      const s: Status =
+        raw === "confirmed" ? "confirmed" :
+        raw === "confirming" ? "confirming" :
+        raw === "failed" ? "failed" :
+        raw === "expired" ? "expired" :
+        "pending";
       setStatus(s);
       if (s === "confirmed") {
         if (pollRef.current) clearInterval(pollRef.current);
@@ -91,9 +100,10 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
       }
     };
     poll();
-    pollRef.current = window.setInterval(poll, 8000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    pollRef.current = window.setInterval(poll, 5000);
+    return () => { active = false; if (pollRef.current) clearInterval(pollRef.current); };
   }, [invoice]);
+
 
   const copyAddress = async () => {
     if (!invoice) return;
