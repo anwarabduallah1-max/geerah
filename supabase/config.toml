@@ -1,4 +1,4 @@
 project_id = "wiyukmuimanrltzrdrtv"
 
-[functions.nowpayments-ipn]
+[functions.plisio-callback]
 verify_jwt = false

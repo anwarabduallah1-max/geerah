@@ -13,14 +13,12 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
+    if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Unauthorized' }, 401)
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const npApiKey = Deno.env.get('NOWPAYMENTS_API_KEY')!
+    const plisioKey = Deno.env.get('PLISIO_API_KEY')!
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -37,63 +35,61 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey)
 
-    // 1. Create our invoice row first so we have a stable order_id
+    // Insert pending invoice row first so we have a stable order id
     const { data: inv, error: invErr } = await admin
       .from('payment_invoices')
-      .insert({
-        user_id: userId,
-        purpose,
-        purpose_payload: payload ?? {},
-        amount_sar,
-      })
+      .insert({ user_id: userId, purpose, purpose_payload: payload ?? {}, amount_sar })
       .select()
       .single()
     if (invErr || !inv) return json({ error: invErr?.message || 'invoice_create_failed' }, 500)
 
-    const ipnUrl = `${supabaseUrl}/functions/v1/nowpayments-ipn`
+    // Plisio expects fiat amount in supported fiat (USD). SAR ≈ 0.2667 USD.
+    const usdAmount = Number((amount_sar * 0.2667).toFixed(2))
+    const callbackUrl = `${supabaseUrl}/functions/v1/plisio-callback`
 
-    // 2. Ask NOWPayments to create the payment
-    const npRes = await fetch('https://api.nowpayments.io/v1/payment', {
-      method: 'POST',
-      headers: { 'x-api-key': npApiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        // NOWPayments doesn't support SAR as a fiat — convert to USD (1 SAR ≈ 0.2667 USD)
-        price_amount: Number((amount_sar * 0.2667).toFixed(2)),
-        price_currency: 'usd',
-        pay_currency: 'usdttrc20',
-        order_id: inv.id,
-        order_description: `Jeerah ${purpose}`,
-        ipn_callback_url: ipnUrl,
-      }),
+    const params = new URLSearchParams({
+      api_key: plisioKey,
+      order_number: inv.id,
+      order_name: `Jeerah ${purpose}`,
+      source_currency: 'USD',
+      source_amount: String(usdAmount),
+      currency: 'BTC', // default crypto; Plisio's hosted page lets buyer switch & pay with card via Mercuryo
+      allow_psys_cids: 'BTC,ETH,USDT,USDT_TRX,TRX,LTC,BCH,BNB', // shown on the hosted page
+      callback_url: `${callbackUrl}?json=true`,
+      email: '',
+      plugin: 'jeerah',
+      version: '1.0',
     })
 
+    const npRes = await fetch(`https://api.plisio.net/api/v1/invoices/new?${params.toString()}`)
     const npData = await npRes.json()
-    if (!npRes.ok) {
+
+    if (!npRes.ok || npData?.status !== 'success' || !npData?.data) {
       await admin.from('payment_invoices').update({ status: 'failed', raw_ipn: npData }).eq('id', inv.id)
-      return json({ error: 'nowpayments_error', details: npData }, 502)
+      return json({ error: 'plisio_error', details: npData }, 502)
     }
 
+    const d = npData.data
     await admin
       .from('payment_invoices')
       .update({
-        np_payment_id: String(npData.payment_id),
-        np_invoice_id: npData.invoice_id ? String(npData.invoice_id) : null,
-        pay_address: npData.pay_address,
-        pay_amount: npData.pay_amount,
-        pay_currency: npData.pay_currency,
+        plisio_txn_id: d.txn_id,
+        invoice_url: d.invoice_url,
+        pay_address: d.wallet_hash ?? null,
+        pay_amount: d.invoice_total_sum ?? null,
+        pay_currency: d.currency ?? 'BTC',
       })
       .eq('id', inv.id)
 
     return json({
       invoice_id: inv.id,
-      pay_address: npData.pay_address,
-      pay_amount: npData.pay_amount,
-      pay_currency: npData.pay_currency,
-      np_payment_id: npData.payment_id,
-      expiration_estimate_date: npData.expiration_estimate_date ?? null,
+      invoice_url: d.invoice_url,
+      txn_id: d.txn_id,
+      pay_amount: d.invoice_total_sum,
+      pay_currency: d.currency,
     })
   } catch (e) {
-    console.error('create-invoice error', e)
+    console.error('plisio-create-invoice error', e)
     return json({ error: (e as Error).message }, 500)
   }
 })

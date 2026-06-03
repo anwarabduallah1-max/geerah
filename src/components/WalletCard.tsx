@@ -79,10 +79,10 @@ export function WalletCard() {
             disabled={!amount || amount < 150 || amount > 1000}
             className="inline-flex items-center gap-1 text-xs font-bold px-4 h-10 rounded-2xl bg-primary text-primary-foreground disabled:opacity-50 gpu tap-fast shrink-0"
           >
-            <Plus size={14} /> شحن USDT
+            <Plus size={14} /> شحن المحفظة
           </motion.button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1.5">الحد الأدنى 150 ر.س — يُدفع عبر USDT (TRC20)</p>
+        <p className="text-[10px] text-muted-foreground mt-1.5">الحد الأدنى 150 ر.س — ادفع ببطاقة ائتمان أو عملة رقمية عبر Plisio</p>
       </motion.div>
 
       <motion.div variants={staggerItem} transition={spring.staggerChild} className="space-y-2">

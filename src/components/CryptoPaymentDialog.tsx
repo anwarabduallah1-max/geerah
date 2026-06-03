@@ -3,8 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
-import QRCode from "qrcode";
+import { Loader2, CheckCircle2, XCircle, Clock, ExternalLink, CreditCard } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Purpose = "topup" | "subscription" | "photo_slot";
@@ -22,26 +21,24 @@ interface Props {
 
 interface Invoice {
   invoice_id: string;
-  pay_address: string;
-  pay_amount: number;
-  pay_currency: string;
+  invoice_url: string;
+  txn_id: string;
+  pay_amount?: number;
+  pay_currency?: string;
 }
 
 export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purpose, payload, onConfirmed }: Props) {
   const qc = useQueryClient();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [status, setStatus] = useState<Status>("pending");
-  const [qrUrl, setQrUrl] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
-  // Create invoice when opening
   useEffect(() => {
     if (!open) {
       setInvoice(null);
       setStatus("pending");
-      setQrUrl("");
       setError(null);
       if (pollRef.current) clearInterval(pollRef.current);
       return;
@@ -50,37 +47,31 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
     (async () => {
       setCreating(true);
       setError(null);
-      const { data, error } = await supabase.functions.invoke("nowpayments-create-invoice", {
+      const { data, error } = await supabase.functions.invoke("plisio-create-invoice", {
         body: { purpose, amount_sar: amountSar, payload: payload ?? {} },
       });
       if (cancelled) return;
       setCreating(false);
-      if (error || !data?.pay_address) {
+      if (error || !data?.invoice_url) {
         const msg = (data as any)?.error ? JSON.stringify((data as any).error) : error?.message || "تعذّر إنشاء الفاتورة";
         setError(msg);
         return;
       }
       setInvoice(data as Invoice);
-      try {
-        const url = await QRCode.toDataURL((data as Invoice).pay_address, { margin: 1, width: 220 });
-        setQrUrl(url);
-      } catch {}
+      // Auto-open Plisio's hosted invoice in a new tab so the user can pay by card or crypto
+      try { window.open((data as Invoice).invoice_url, "_blank", "noopener,noreferrer"); } catch {}
     })();
     return () => { cancelled = true; };
   }, [open, purpose, amountSar]);
 
-  // Poll invoice status directly from the payment_invoices table (RLS scopes to owner)
+  // Poll status (server polls Plisio for us if still pending)
   useEffect(() => {
     if (!invoice) return;
     let active = true;
     const poll = async () => {
-      const { data } = await supabase
-        .from("payment_invoices")
-        .select("status")
-        .eq("id", invoice.invoice_id)
-        .maybeSingle();
+      const { data } = await supabase.functions.invoke("plisio-invoice-status", { body: { id: invoice.invoice_id } });
       if (!active || !data) return;
-      const raw = data.status as string;
+      const raw = (data as any).status as string;
       const s: Status =
         raw === "confirmed" ? "confirmed" :
         raw === "confirming" ? "confirming" :
@@ -100,16 +91,9 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
       }
     };
     poll();
-    pollRef.current = window.setInterval(poll, 5000);
+    pollRef.current = window.setInterval(poll, 6000);
     return () => { active = false; if (pollRef.current) clearInterval(pollRef.current); };
   }, [invoice]);
-
-
-  const copyAddress = async () => {
-    if (!invoice) return;
-    await navigator.clipboard.writeText(invoice.pay_address);
-    toast.success("تم نسخ العنوان");
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -117,14 +101,14 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
         <DialogHeader>
           <DialogTitle className="text-right">{title}</DialogTitle>
           <DialogDescription className="text-right">
-            ادفع بعملة USDT على شبكة TRC20 (Tron) فقط. أي شبكة أخرى ستؤدي إلى فقدان الأموال.
+            ادفع بأمان عبر بوابة Plisio — بطاقة ائتمان/خصم أو عملة رقمية. سيتم تأكيد الدفعة تلقائيًا.
           </DialogDescription>
         </DialogHeader>
 
         {creating && (
           <div className="flex flex-col items-center py-8 gap-3">
             <Loader2 className="animate-spin text-primary" />
-            <p className="text-xs text-muted-foreground">جارٍ إنشاء عنوان الدفع…</p>
+            <p className="text-xs text-muted-foreground">جارٍ إنشاء فاتورة الدفع…</p>
           </div>
         )}
 
@@ -137,24 +121,21 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
         )}
 
         {invoice && !creating && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="text-center">
-              <p className="text-3xl font-bold">{invoice.pay_amount} <span className="text-base text-muted-foreground uppercase">{invoice.pay_currency.replace('trc20','')}</span></p>
-              <p className="text-[11px] text-muted-foreground mt-1">≈ {amountSar} ر.س — شبكة TRC20</p>
+              <p className="text-3xl font-bold">{amountSar} <span className="text-base text-muted-foreground">ر.س</span></p>
+              <p className="text-[11px] text-muted-foreground mt-1">≈ {(amountSar * 0.2667).toFixed(2)} USD</p>
             </div>
 
-            {qrUrl && (
-              <div className="flex justify-center">
-                <img src={qrUrl} alt="QR" className="w-44 h-44 rounded-2xl bg-white p-2" />
-              </div>
-            )}
-
-            <div className="glass rounded-2xl p-3 flex items-center gap-2">
-              <code className="flex-1 text-[10px] break-all text-left ltr:text-left" dir="ltr">{invoice.pay_address}</code>
-              <Button size="icon" variant="ghost" className="shrink-0" onClick={copyAddress}>
-                <Copy size={14} />
-              </Button>
-            </div>
+            <Button
+              className="w-full rounded-2xl h-12 gap-2"
+              onClick={() => window.open(invoice.invoice_url, "_blank", "noopener,noreferrer")}
+            >
+              <CreditCard size={16} /> ادفع الآن <ExternalLink size={14} />
+            </Button>
+            <p className="text-[11px] text-muted-foreground text-center">
+              تفتح صفحة الدفع في نافذة جديدة. اختر "بطاقة ائتمان" داخل صفحة Plisio لإتمام الدفع بالفيزا/ماستركارد.
+            </p>
 
             <StatusBadge status={status} />
           </div>
@@ -166,8 +147,8 @@ export function CryptoPaymentDialog({ open, onOpenChange, title, amountSar, purp
 
 function StatusBadge({ status }: { status: Status }) {
   const map: Record<Status, { label: string; icon: any; cls: string }> = {
-    pending: { label: "بانتظار الدفع", icon: Clock, cls: "bg-muted/40 text-muted-foreground" },
-    confirming: { label: "جاري التأكيد على الشبكة…", icon: Loader2, cls: "bg-primary/15 text-primary" },
+    pending: { label: "بانتظار الدفع…", icon: Clock, cls: "bg-muted/40 text-muted-foreground" },
+    confirming: { label: "جاري التأكيد…", icon: Loader2, cls: "bg-primary/15 text-primary" },
     confirmed: { label: "تم التأكيد ✓", icon: CheckCircle2, cls: "bg-primary text-primary-foreground" },
     failed: { label: "فشل الدفع", icon: XCircle, cls: "bg-destructive/15 text-destructive" },
     expired: { label: "انتهت صلاحية الفاتورة", icon: XCircle, cls: "bg-destructive/15 text-destructive" },
