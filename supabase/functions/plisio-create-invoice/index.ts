@@ -81,9 +81,18 @@ Deno.serve(async (req) => {
         invoice_url: d.invoice_url,
         pay_address: d.wallet_hash ?? null,
         pay_amount: d.invoice_total_sum ?? null,
-        pay_currency: d.currency ?? 'BTC',
+        pay_currency: d.currency ?? null,
       })
       .eq('id', inv.id)
+
+    return json({
+      invoice_id: inv.id,
+      invoice_url: d.invoice_url,
+      txn_id: d.txn_id,
+      pay_amount: d.invoice_total_sum,
+      pay_currency: d.currency,
+      supports_card: true,
+    })
 
     return json({
       invoice_id: inv.id,
