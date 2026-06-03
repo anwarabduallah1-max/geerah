@@ -498,11 +498,13 @@ export type Database = {
           applied_at: string | null
           created_at: string
           id: string
+          invoice_url: string | null
           np_invoice_id: string | null
           np_payment_id: string | null
           pay_address: string | null
           pay_amount: number | null
           pay_currency: string
+          plisio_txn_id: string | null
           purpose: string
           purpose_payload: Json
           raw_ipn: Json | null
@@ -515,11 +517,13 @@ export type Database = {
           applied_at?: string | null
           created_at?: string
           id?: string
+          invoice_url?: string | null
           np_invoice_id?: string | null
           np_payment_id?: string | null
           pay_address?: string | null
           pay_amount?: number | null
           pay_currency?: string
+          plisio_txn_id?: string | null
           purpose: string
           purpose_payload?: Json
           raw_ipn?: Json | null
@@ -532,11 +536,13 @@ export type Database = {
           applied_at?: string | null
           created_at?: string
           id?: string
+          invoice_url?: string | null
           np_invoice_id?: string | null
           np_payment_id?: string | null
           pay_address?: string | null
           pay_amount?: number | null
           pay_currency?: string
+          plisio_txn_id?: string | null
           purpose?: string
           purpose_payload?: Json
           raw_ipn?: Json | null
