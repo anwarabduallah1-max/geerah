@@ -93,14 +93,6 @@ Deno.serve(async (req) => {
       pay_currency: d.currency,
       supports_card: true,
     })
-
-    return json({
-      invoice_id: inv.id,
-      invoice_url: d.invoice_url,
-      txn_id: d.txn_id,
-      pay_amount: d.invoice_total_sum,
-      pay_currency: d.currency,
-    })
   } catch (e) {
     console.error('plisio-create-invoice error', e)
     return json({ error: (e as Error).message }, 500)
