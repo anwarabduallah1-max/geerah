@@ -47,14 +47,18 @@ Deno.serve(async (req) => {
     const usdAmount = Number((amount_sar * 0.2667).toFixed(2))
     const callbackUrl = `${supabaseUrl}/functions/v1/plisio-callback`
 
+    // NOTE: we intentionally omit `currency` so Plisio's hosted invoice page renders
+    // the full payment selector — including the "Pay with Card (Visa/Mastercard)"
+    // option powered by Mercuryo's fiat-to-crypto gateway — alongside crypto methods.
     const params = new URLSearchParams({
       api_key: plisioKey,
       order_number: inv.id,
       order_name: `Jeerah ${purpose}`,
       source_currency: 'USD',
       source_amount: String(usdAmount),
-      currency: 'BTC', // default crypto; Plisio's hosted page lets buyer switch & pay with card via Mercuryo
-      allow_psys_cids: 'BTC,ETH,USDT,USDT_TRX,TRX,LTC,BCH,BNB', // shown on the hosted page
+      allow_psys_cids: 'BTC,ETH,USDT,USDT_TRX,TRX,LTC,BCH,BNB',
+      allowed_payment_methods: 'crypto,card', // explicitly enable card (fiat) checkout
+      fiat_gateway: 'mercuryo', // route card payments through Mercuryo
       callback_url: `${callbackUrl}?json=true`,
       email: '',
       plugin: 'jeerah',
