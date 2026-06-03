@@ -2,6 +2,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { z } from 'npm:zod@3'
 
+// NOWPayments invoice with fiat/card support enabled.
+// Uses price_currency=USD (fiat) so NOWPayments' hosted checkout shows the
+// "Pay with Card (Visa/Mastercard)" option (Mercuryo/Simplex fiat-to-crypto)
+// alongside direct crypto payments.
+
 const BodySchema = z.object({
   purpose: z.enum(['topup', 'subscription', 'photo_slot']),
   amount_sar: z.number().positive().max(5000),
@@ -18,7 +23,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const plisioKey = Deno.env.get('PLISIO_API_KEY')!
+    const npKey = Deno.env.get('NOWPAYMENTS_API_KEY')!
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -35,7 +40,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey)
 
-    // Insert pending invoice row first so we have a stable order id
     const { data: inv, error: invErr } = await admin
       .from('payment_invoices')
       .insert({ user_id: userId, purpose, purpose_payload: payload ?? {}, amount_sar })
@@ -43,58 +47,53 @@ Deno.serve(async (req) => {
       .single()
     if (invErr || !inv) return json({ error: invErr?.message || 'invoice_create_failed' }, 500)
 
-    // Plisio expects fiat amount in supported fiat (USD). SAR ≈ 0.2667 USD.
     const usdAmount = Number((amount_sar * 0.2667).toFixed(2))
-    const callbackUrl = `${supabaseUrl}/functions/v1/plisio-callback`
+    const ipnUrl = `${supabaseUrl}/functions/v1/nowpayments-ipn`
 
-    // NOTE: we intentionally omit `currency` so Plisio's hosted invoice page renders
-    // the full payment selector — including the "Pay with Card (Visa/Mastercard)"
-    // option powered by Mercuryo's fiat-to-crypto gateway — alongside crypto methods.
-    const params = new URLSearchParams({
-      api_key: plisioKey,
-      order_number: inv.id,
-      order_name: `Jeerah ${purpose}`,
-      source_currency: 'USD',
-      source_amount: String(usdAmount),
-      allow_psys_cids: 'BTC,ETH,USDT,USDT_TRX,TRX,LTC,BCH,BNB',
-      allowed_payment_methods: 'crypto,card', // explicitly enable card (fiat) checkout
-      fiat_gateway: 'mercuryo', // route card payments through Mercuryo
-      callback_url: `${callbackUrl}?json=true`,
-      email: '',
-      plugin: 'jeerah',
-      version: '1.0',
-    })
-
-    const npRes = await fetch(`https://api.plisio.net/api/v1/invoices/new?${params.toString()}`)
-    const npData = await npRes.json()
-
-    if (!npRes.ok || npData?.status !== 'success' || !npData?.data) {
-      await admin.from('payment_invoices').update({ status: 'failed', raw_ipn: npData }).eq('id', inv.id)
-      return json({ error: 'plisio_error', details: npData }, 502)
+    const body = {
+      price_amount: usdAmount,
+      price_currency: 'usd', // fiat → unlocks card payment on hosted checkout
+      order_id: inv.id,
+      order_description: `Jeerah ${purpose}`,
+      ipn_callback_url: ipnUrl,
+      success_url: `${supabaseUrl}/functions/v1/nowpayments-ipn?status=success`,
+      cancel_url: `${supabaseUrl}/functions/v1/nowpayments-ipn?status=cancel`,
+      is_fee_paid_by_user: true,
+      // Leaving pay_currency undefined lets the buyer pick crypto OR card on the hosted page.
     }
 
-    const d = npData.data
+    const npRes = await fetch('https://api.nowpayments.io/v1/invoice', {
+      method: 'POST',
+      headers: { 'x-api-key': npKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const npData = await npRes.json()
+
+    if (!npRes.ok || !npData?.invoice_url) {
+      await admin.from('payment_invoices').update({ status: 'failed', raw_ipn: npData }).eq('id', inv.id)
+      return json({ error: 'nowpayments_error', details: npData }, 502)
+    }
+
     await admin
       .from('payment_invoices')
       .update({
-        plisio_txn_id: d.txn_id,
-        invoice_url: d.invoice_url,
-        pay_address: d.wallet_hash ?? null,
-        pay_amount: d.invoice_total_sum ?? null,
-        pay_currency: d.currency ?? null,
+        plisio_txn_id: String(npData.id ?? ''), // reuse column to store gateway txn id
+        invoice_url: npData.invoice_url,
+        pay_amount: usdAmount,
+        pay_currency: 'USD',
       })
       .eq('id', inv.id)
 
     return json({
       invoice_id: inv.id,
-      invoice_url: d.invoice_url,
-      txn_id: d.txn_id,
-      pay_amount: d.invoice_total_sum,
-      pay_currency: d.currency,
+      invoice_url: npData.invoice_url,
+      txn_id: String(npData.id ?? ''),
+      pay_amount: usdAmount,
+      pay_currency: 'USD',
       supports_card: true,
     })
   } catch (e) {
-    console.error('plisio-create-invoice error', e)
+    console.error('nowpayments-create-invoice error', e)
     return json({ error: (e as Error).message }, 500)
   }
 })
