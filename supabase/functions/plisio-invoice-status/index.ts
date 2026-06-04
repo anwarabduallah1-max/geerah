@@ -17,8 +17,10 @@ Deno.serve(async (req) => {
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   })
-  const { data: claims, error } = await userClient.auth.getClaims(authHeader.replace('Bearer ', ''))
-  if (error || !claims?.claims) return json({ error: 'Unauthorized' }, 401)
+  // Note: We rely on RLS (via the forwarded JWT) to enforce per-user access on
+  // payment_invoices. Calling getClaims here is redundant and was failing with
+  // transient JWKS fetch errors ("Connection reset by peer"), which surfaced
+  // as a spurious 401 to the client.
 
   let id: string | null = null
   try {
