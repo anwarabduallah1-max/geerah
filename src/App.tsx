@@ -61,10 +61,10 @@ const AppShell = () => {
     <div className="h-svh flex flex-col overflow-hidden w-full pb-16">
       <main className="flex-1 relative overflow-hidden">
         {/* Persistent tab panes — mounted once, toggled via CSS for instant switching */}
-        <TabPane active={currentTab === "/"}><MemoMap /></TabPane>
-        <TabPane active={currentTab === "/neighbors"}><MemoNeighbors /></TabPane>
-        <TabPane active={currentTab === "/chats"}><MemoChats /></TabPane>
-        <TabPane active={currentTab === "/profile"}><MemoProfile /></TabPane>
+        <TabPane active={currentTab === "/"}><ErrorBoundary><MemoMap /></ErrorBoundary></TabPane>
+        <TabPane active={currentTab === "/neighbors"}><ErrorBoundary><MemoNeighbors /></ErrorBoundary></TabPane>
+        <TabPane active={currentTab === "/chats"}><ErrorBoundary><MemoChats /></ErrorBoundary></TabPane>
+        <TabPane active={currentTab === "/profile"}><ErrorBoundary><MemoProfile /></ErrorBoundary></TabPane>
 
         {/* Non-tab routes render on top */}
         {!currentTab && (
