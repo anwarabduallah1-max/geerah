@@ -28,10 +28,18 @@ export default function ProfilePage() {
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev,
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_my_profile");
-      return (data as any[])?.[0] ?? null;
+      try {
+        const { data, error } = await supabase.rpc("get_my_profile");
+        if (error) {
+          console.error("Profile fetch error:", error.message);
+          return null;
+        }
+        return (data as any[])?.[0] ?? null;
+      } catch (err) {
+        console.error("Unexpected profile fetch error:", err);
+        return null;
+      }
     },
-
   });
 
   const { data: itemCount } = useQuery({
@@ -41,8 +49,20 @@ export default function ProfilePage() {
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev,
     queryFn: async () => {
-      const { count } = await supabase.from("items").select("*", { count: "exact", head: true }).eq("owner_id", user!.id);
-      return count || 0;
+      try {
+        const { count, error } = await supabase
+          .from("items")
+          .select("*", { count: "exact", head: true })
+          .eq("owner_id", user!.id);
+        if (error) {
+          console.error("Item count fetch error:", error.message);
+          return 0;
+        }
+        return count || 0;
+      } catch (err) {
+        console.error("Unexpected item count error:", err);
+        return 0;
+      }
     },
   });
 
