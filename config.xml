@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<widget id="com.anwar.jeerah" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>Jeerah</name>
+    <description>تطبيق جيرة ومشاركة الموارد بين الجيران</description>
+    <author email="support@jeerah.com">Anwar</author>
+    <content src="index.html" />
+    <access origin="*" />
+    <preference name="Orientation" value="portrait" />
+</widget>
