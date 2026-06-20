@@ -35,11 +35,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Sync Capacitor with Android
+            - name: Sync Capacitor with Android
         run: |
-          npx cap integrity
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init Jeerah com.jeerah.app --web-dir=dist || true
           npx cap add android || true
           npx cap sync android
+          
 
       - name: Build Android APK (Debug)
         run: |
