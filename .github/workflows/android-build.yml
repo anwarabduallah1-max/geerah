@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   push:
     branches:
-      - main # أو اسم الفرع الأساسي عندك إذا كان master
+      - main
 
 jobs:
   build:
@@ -17,7 +17,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-         
           cache: 'npm'
 
       - name: Install Dependencies
@@ -35,13 +34,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-            - name: Sync Capacitor with Android
+      - name: Sync Capacitor with Android
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init Jeerah com.jeerah.app --web-dir=dist || true
           npx cap add android || true
           npx cap sync android
-          
 
       - name: Build Android APK (Debug)
         run: |
