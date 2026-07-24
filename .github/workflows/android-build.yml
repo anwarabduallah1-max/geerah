@@ -41,11 +41,10 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
-      - name: Build Android APK (Debug)
+      - name: Build Android APK (Unsigned Release)
         run: |
           cd android
           
-          # استبعاد تكرار مكتبات كوتلن إجبارياً من الـ Gradle الرئيسي
           cat << 'EOF' > patch.gradle
           subprojects {
               project.configurations.all {
@@ -60,12 +59,12 @@ jobs:
           }
           EOF
           cat patch.gradle >> build.gradle
-          
-          ./gradlew assembleDebug --no-daemon
+
+          ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jeerah-app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: jeerah-app-release
+          path: android/app/build/outputs/apk/release/*.apk
           
